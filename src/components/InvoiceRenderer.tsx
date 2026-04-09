@@ -744,7 +744,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       </div>
 
       {/* FLIGHT DETAILS */}
-      {(invoiceMeta.invoice_type === 'flight_invoice' || invoiceMeta.invoice_type === 'package_invoice' || invoiceMeta.invoice_type === 'travel_invoice') && (
+      {(invoiceMeta.invoice_type === 'Flug' || invoiceMeta.invoice_type === 'Package' || invoiceMeta.invoice_type === 'travel_invoice') && (
         <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-800/10 space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
@@ -931,7 +931,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       )}
 
       {/* HOTEL DETAILS */}
-      {(invoiceMeta.invoice_type === 'hotel_invoice' || invoiceMeta.invoice_type === 'package_invoice' || invoiceMeta.invoice_type === 'travel_invoice') && (
+      {(invoiceMeta.invoice_type === 'Hotel' || invoiceMeta.invoice_type === 'Package' || invoiceMeta.invoice_type === 'travel_invoice') && (
         <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 space-y-6">
           <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
             <Briefcase size={14} /> Hotel Details

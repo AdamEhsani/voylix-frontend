@@ -16,8 +16,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-
-// Using API_BASE_URL from utils as API_URL to match user's logic
+import { toast } from 'sonner';
 
 export function AgencyProfilePage() {
   const { user } = useAuth();
@@ -88,8 +87,6 @@ export function AgencyProfilePage() {
           bic: data.bic || '',
           bankName: data.bankName || '',
         });
-
-        setPasswordForm(prev => ({ ...prev, email: data.email || '' }));
 
         if (data.logoPath) {
           const cleanPath = normalizePath(data.logoPath);
@@ -168,10 +165,10 @@ export function AgencyProfilePage() {
         setLogoPreview(`${API_URL}${result.logoPath}`);
       }
       
-      alert("Agenturprofil erfolgreich gespeichert.");
+      toast.success("Agenturprofil erfolgreich gespeichert.");
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Fehler beim Speichern");
+      toast.error(err.message || "Fehler beim Speichern");
     } finally {
       setLoading(false);
     }
@@ -180,7 +177,7 @@ export function AgencyProfilePage() {
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert("Passwörter stimmen nicht überein.");
+      toast.error("Passwörter stimmen nicht überein.");
       return;
     }
 
@@ -202,20 +199,23 @@ export function AgencyProfilePage() {
       });
 
       if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(errText || "Fehler beim Ändern des Passworts");
+        const errData = await response.json().catch(() => null);
+        const errorMessage = errData?.errors 
+          ? Object.values(errData.errors).flat().join(", ") 
+          : (errData?.title || "Fehler beim Ändern des Passworts");
+        throw new Error(errorMessage);
       }
 
-      alert("Passwort erfolgreich geändert.");
-      setPasswordForm(prev => ({
-        ...prev,
+      toast.success("Passwort erfolgreich geändert.");
+      setPasswordForm({
+        email: '',
         oldPassword: '',
         newPassword: '',
         confirmPassword: ''
-      }));
+      });
     } catch (err: any) {
       console.error(err);
-      alert(err.message || "Fehler beim Ändern des Passworts");
+      toast.error(err.message || "Fehler beim Ändern des Passworts");
     } finally {
       setPasswordLoading(false);
     }
@@ -461,17 +461,19 @@ export function AgencyProfilePage() {
             </div>
           </div>
 
-                    {/* Password Change */}
+          {/* Password Change */}
           <div className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
             <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-8 flex items-center gap-2">
               <Lock size={20} className="text-zinc-400" /> Passwort ändern
             </h3>
-            <form onSubmit={handlePasswordChange} className="space-y-6">
+            <form onSubmit={handlePasswordChange} className="space-y-6" autoComplete="off">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-zinc-500">E-Mail</label>
                   <input 
                     type="email" 
+                    name="password-change-email"
+                    autoComplete="off"
                     value={passwordForm.email}
                     onChange={(e) => setPasswordForm(prev => ({ ...prev, email: e.target.value }))}
                     required
@@ -483,6 +485,8 @@ export function AgencyProfilePage() {
                   <div className="relative">
                     <input 
                       type={showPasswords.old ? "text" : "password"}
+                      name="current-password"
+                      autoComplete="current-password"
                       value={passwordForm.oldPassword}
                       onChange={(e) => setPasswordForm(prev => ({ ...prev, oldPassword: e.target.value }))}
                       required
@@ -502,6 +506,8 @@ export function AgencyProfilePage() {
                   <div className="relative">
                     <input 
                       type={showPasswords.new ? "text" : "password"}
+                      name="new-password"
+                      autoComplete="new-password"
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
                       required
@@ -521,6 +527,8 @@ export function AgencyProfilePage() {
                   <div className="relative">
                     <input 
                       type={showPasswords.confirm ? "text" : "password"}
+                      name="confirm-password"
+                      autoComplete="new-password"
                       value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
                       required
@@ -548,7 +556,6 @@ export function AgencyProfilePage() {
               </div>
             </form>
           </div>
-
         </div>
       </div>
     </div>
