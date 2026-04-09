@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { API_URL } from "../config/api";
 
 type LogoContextType = {
   logoUrl: string | null;
   loading: boolean;
 };
-const API_URL="https://api.voylix.de";
 const LogoContext = createContext<LogoContextType>({
   logoUrl: null,
   loading: true,

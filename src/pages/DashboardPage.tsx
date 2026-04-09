@@ -15,7 +15,8 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { formatCurrency, cn } from '../utils';
 import LogoAgency from '../components/LogoAgency';
-const API_URL="https://api.voylix.de";
+import { API_URL } from "../config/api";
+
 type UnpaidInvoice = {
   invoiceId: number;
   createdAt: string;

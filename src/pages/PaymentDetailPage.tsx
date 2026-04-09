@@ -10,6 +10,7 @@ import {
   Train
 } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
+import { API_URL } from "../config/api";
 
 export function PaymentDetailPage() {
   const { id } = useParams();
@@ -17,7 +18,6 @@ export function PaymentDetailPage() {
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('Überweisung');
   const [isSaving, setIsSaving] = useState(false);
-  const API_URL="https://api.voylix.de";
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

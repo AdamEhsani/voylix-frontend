@@ -1,3 +1,4 @@
+import { API_URL } from "../config/api";
 import React, { useState, useEffect } from 'react';
 import {
   Search,
@@ -11,12 +12,13 @@ import {
   ArrowUpDown,
   ChevronUp,
   ChevronDown,
-  Loader2
+  Loader2,
+  Mail
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { cn, formatCurrency } from '../utils';
+import { cn} from '../utils';
 import { useNavigate } from "react-router-dom";
-const API_URL="https://api.voylix.de";
+
 interface APICustomer {
   id: number;
   agencyId: number;
@@ -37,12 +39,12 @@ interface APICustomer {
   street?: string;
 
   company?: {
-    name?: '',
-    street?: '',
-    city?: '',
-    postalCode?: '',
-    country?: '',
-    phone?: ''
+    name?: string;
+    street?: string;
+    city?: string;
+    postalCode?: string;
+    country?: string;
+    phone?: string;
   }
 }
 
@@ -53,6 +55,7 @@ export function CustomersPage() {
   const [paymentAmount, setPaymentAmount] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<string>('Bar');
   const [editingCustomer, setEditingCustomer] = useState<APICustomer | null>(null);
+  const [editType, setEditType] = useState<'person' | 'company'>('person');
   const [sortConfig, setSortConfig] = useState<{ key: keyof APICustomer; direction: 'asc' | 'desc' } | null>(null);
   const [customers, setCustomers] = useState<APICustomer[]>([]);
   const token = localStorage.getItem("token");
@@ -68,7 +71,6 @@ export function CustomersPage() {
       });
 
       if (!res.ok) {
-        // Fallback to empty or handle error
         setLoading(false);
         return;
       }
@@ -110,6 +112,16 @@ export function CustomersPage() {
 
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const startEditing = (customer: APICustomer) => {
+    setEditingCustomer(customer);
+    // Detect type based on company name
+    if (customer.company?.name) {
+      setEditType('company');
+    } else {
+      setEditType('person');
     }
   };
 
@@ -274,7 +286,7 @@ export function CustomersPage() {
                   </th>
                   <th
                     onClick={() => requestSort('phone')}
-                    className="px-6 py-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest hidden md:table-cell cursor-pointer group hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
+                    className="px-6 py-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest cursor-pointer group hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
                   >
                     <div className="flex items-center">
                       Telefon
@@ -282,21 +294,12 @@ export function CustomersPage() {
                     </div>
                   </th>
                   <th
-                    onClick={() => requestSort('total_spent')}
-                    className="px-6 py-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest hidden lg:table-cell cursor-pointer group hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
-                  >
-                    <div className="flex items-center">
-                      Umsatz
-                      <SortIcon columnKey="total_spent" />
-                    </div>
-                  </th>
-                  <th
-                    onClick={() => requestSort('balance_due')}
+                    onClick={() => requestSort('email')}
                     className="px-6 py-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest cursor-pointer group hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
                   >
                     <div className="flex items-center">
-                      Status
-                      <SortIcon columnKey="balance_due" />
+                      Email
+                      <SortIcon columnKey="email" />
                     </div>
                   </th>
                   <th className="px-6 py-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-right">Aktionen</th>
@@ -312,38 +315,25 @@ export function CustomersPage() {
                         </div>
                         <div>
                           <p className="font-bold text-zinc-900 dark:text-white">{customer.firstName} {customer.lastName}</p>
-                          <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">{customer.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 hidden md:table-cell">
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-xs text-zinc-500">
                         <Phone size={12} />
                         <span>{customer.phone || '-'}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 hidden lg:table-cell">
-                      <p className="text-sm font-bold text-zinc-900 dark:text-white">
-                        {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(customer.total_spent || 0)}
-                      </p>
-                    </td>
                     <td className="px-6 py-4">
-                      <span className={cn(
-                        "text-sm font-bold",
-                        (customer.balance_due || 0) > 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"
-                      )}>
-                        {(customer.balance_due || 0) > 0
-                          ? new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(customer.balance_due || 0)
-                          : (customer.balance_due || 0) < 0
-                            ? `+${new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(Math.abs(customer.balance_due || 0))}`
-                            : '0,00 €'
-                        }
-                      </span>
+                      <div className="flex items-center gap-2 text-xs text-emerald-600 font-bold uppercase tracking-wider">
+                        <Mail size={12} />
+                        <span>{customer.email}</span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => { setEditingCustomer(customer); }}
+                          onClick={() => { startEditing(customer); }}
                           className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all"
                         >
                           <Edit2 size={16} />
@@ -359,7 +349,7 @@ export function CustomersPage() {
                 ))}
                 {sortedCustomers.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-zinc-500">
+                    <td colSpan={4} className="px-6 py-12 text-center text-zinc-500">
                       Keine Kunden gefunden.
                     </td>
                   </tr>
@@ -375,9 +365,37 @@ export function CustomersPage() {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white dark:bg-zinc-900 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-800/50">
-              <div>
-                <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Kunde bearbeiten</h3>
-                <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider">{editingCustomer.phone} | {editingCustomer.email}</p>
+              <div className="flex items-center gap-6">
+                <div>
+                  <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Kunde bearbeiten</h3>
+                  <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider">{editingCustomer.phone} | {editingCustomer.email}</p>
+                </div>
+
+                {/* Type Toggle */}
+                <div className="flex p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
+                  <button
+                    onClick={() => setEditType('person')}
+                    className={cn(
+                      "px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                      editType === 'person'
+                        ? "bg-white dark:bg-zinc-700 text-emerald-600 shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                    )}
+                  >
+                    Privatperson
+                  </button>
+                  <button
+                    onClick={() => setEditType('company')}
+                    className={cn(
+                      "px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                      editType === 'company'
+                        ? "bg-white dark:bg-zinc-700 text-emerald-600 shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                    )}
+                  >
+                    Unternehmen
+                  </button>
+                </div>
               </div>
               <button
                 onClick={() => setEditingCustomer(null)}
@@ -389,263 +407,231 @@ export function CustomersPage() {
 
             <div className="flex-1 overflow-y-auto p-8">
               <div className="grid grid-cols-1 gap-12">
-                {/* Left Column: Personal Info */}
-                <div className="lg:col-span-2 space-y-8">
-                  <div className="space-y-6">
-                    <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                      <Edit2 size={14} /> Persönliche Informationen
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Vorname</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.firstName}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, firstName: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Nachname</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.lastName}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, lastName: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">E-Mail</label>
-                        <input
-                          type="email"
-                          value={editingCustomer.email}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Telefon</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.phone || ''}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Geburtsdatum</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.dateOfBirth}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, dateOfBirth: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Nationalität</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.nationality || ''}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, nationality: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Straße</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.street}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, street: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Plz</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.postalCode}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, postalCode: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Stadt</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.city}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, city: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Land</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.country}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, country: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Passport Nr</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.passportNumber || ''}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, passportNumber: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Passport gültig bis</label>
-                        <input
-                          type="date"
-                          value={editingCustomer.passportExpiry}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, passportExpiry: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right Column: Finance & Payments */}
-                {/* <div className="space-y-8">
-                  <div className="bg-zinc-50 dark:bg-zinc-800/50 p-6 rounded-2xl border border-zinc-100 dark:border-zinc-800 space-y-6">
-                    <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                      <CreditCard size={14} /> Finanzen & Zahlung
-                    </h4>
-                    
-                    <div className="space-y-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Zahlungsmethode</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {['Kreditkarte', 'Bar', 'ICE', 'Überweisung'].map((method) => (
-                            <button
-                              key={method}
-                              type="button"
-                              onClick={() => setPaymentMethod(method)}
-                              className={cn(
-                                "px-3 py-2 text-[10px] font-bold rounded-lg border transition-all",
-                                paymentMethod === method
-                                  ? "bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20"
-                                  : "bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:border-emerald-500"
-                              )}
-                            >
-                              {method}
-                            </button>
-                          ))}
+                {editType === 'person' ? (
+                  <div className="lg:col-span-2 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="space-y-6">
+                      <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                        <Edit2 size={14} /> Persönliche Informationen
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Vorname</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.firstName}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, firstName: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
                         </div>
-                      </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Nachname</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.lastName}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, lastName: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">E-Mail</label>
+                          <input
+                            type="email"
+                            value={editingCustomer.email}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Telefon</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.phone || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Geburtsdatum</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.dateOfBirth}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, dateOfBirth: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Nationalität</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.nationality || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, nationality: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
 
-                      <div className="space-y-2">
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Betrag erfassen</p>
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold text-xs">€</span>
-                            <input 
-                              type="number"
-                              placeholder="Betrag"
-                              value={paymentAmount}
-                              onChange={(e) => setPaymentAmount(e.target.value)}
-                              className="w-full pl-7 pr-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-                            />
-                          </div>
-                          <button 
-                            onClick={handleAddPayment}
-                            className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20"
-                          >
-                            Buchen
-                          </button>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Straße</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.street || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, street: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Plz</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.postalCode || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, postalCode: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Stadt</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.city || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, city: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Land</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.country || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, country: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Passport Nr</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.passportNumber || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, passportNumber: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Passport gültig bis</label>
+                          <input
+                            type="date"
+                            value={editingCustomer.passportExpiry || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, passportExpiry: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
                         </div>
                       </div>
                     </div>
                   </div>
-                </div> */}
-              </div>
-            </div>
+                ) : (
+                  <div className="lg:col-span-2 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                    <div className="space-y-6">
+                      <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                        <Edit2 size={14} /> Unternehmen Informationen
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Firmenname</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.company?.name || ''}
+                            onChange={(e) =>
+                              setEditingCustomer({
+                                ...editingCustomer,
+                                company: {
+                                  ...(editingCustomer.company || {}),
+                                  name: e.target.value
+                                }
+                              })
+                            }
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Straße</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.company?.street || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, company: { ...(editingCustomer.company || {}), street: e.target.value } })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
 
-            <div className="flex-1 overflow-y-auto p-8">
-              <div className="grid grid-cols-1 gap-12">
-                {/* Left Column: Personal Info */}
-                <div className="lg:col-span-2 space-y-8">
-                  <div className="space-y-6">
-                    <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
-                      <Edit2 size={14} /> Unternehmen Informationen
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Firmenname</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.company?.name || ''}
-                          onChange={(e) =>
-                            setEditingCustomer({
-                              ...editingCustomer,
-                              company: {
-                                ...(editingCustomer.company || {}),
-                                name: e.target.value
-                              }
-                            })
-                          }
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Straße</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.company?.street || ''}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, company: { ...editingCustomer.company, street: e.target.value } })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Sdadt</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.company?.city || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, company: { ...(editingCustomer.company || {}), city: e.target.value } })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Sdadt</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.company?.city || ''}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, company: { ...editingCustomer.company, city: e.target.value } })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Postleitzahl</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.company?.postalCode || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, company: { ...(editingCustomer.company || {}), postalCode: e.target.value } })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Postleitzahl</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.company?.postalCode || ''}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, company: { ...editingCustomer.company, postalCode: e.target.value } })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
-                      </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Land</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.company?.country || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, company: { ...(editingCustomer.company || {}), country: e.target.value } })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Land</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.company?.country || ''}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, company: { ...editingCustomer.company, country: e.target.value } })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Telefon</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.company?.phone || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, company: { ...(editingCustomer.company || {}), phone: e.target.value } })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
                       </div>
+                    </div>
 
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-zinc-500 uppercase">Telefon</label>
-                        <input
-                          type="text"
-                          value={editingCustomer.company?.phone || ''}
-                          onChange={(e) => setEditingCustomer({ ...editingCustomer, company: { ...editingCustomer.company, phone: e.target.value } })}
-                          className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                        />
+                    {/* Common Contact Info for Company */}
+                    <div className="space-y-6 pt-8 border-t border-zinc-100 dark:border-zinc-800">
+                      <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                        <Mail size={14} /> Kontaktinformationen
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">E-Mail</label>
+                          <input
+                            type="email"
+                            value={editingCustomer.email}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Telefon</label>
+                          <input
+                            type="text"
+                            value={editingCustomer.phone || ''}
+                            onChange={(e) => setEditingCustomer({ ...editingCustomer, phone: e.target.value })}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 

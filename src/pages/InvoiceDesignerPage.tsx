@@ -30,7 +30,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import { InvoicePreview } from '../components/InvoicePreview';
 import LogoAgency from '../components/LogoAgency';
-const API_URL="https://api.voylix.de";
+import { API_URL } from "../config/api";
+
 const DEFAULT_SETTINGS: InvoiceDesignerSettings = {
   logoPosition: 'left',
   logoSize: 120,

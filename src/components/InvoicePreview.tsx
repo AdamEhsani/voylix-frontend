@@ -1,7 +1,8 @@
 import React from 'react';
+import { API_URL } from "../config/api";
 import { Printer } from 'lucide-react';
 import { InvoiceDesignerSettings, TravelInvoice } from '../types';
-import { cn } from '../utils';
+import { cn,} from '../utils';
 import LogoAgency from './LogoAgency';
 
 interface InvoicePreviewProps {
@@ -9,7 +10,7 @@ interface InvoicePreviewProps {
   settings: InvoiceDesignerSettings;
   agencyLogoPath?: string | null;
 }
-const API_URL = "https://api.voylix.de";
+
 export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePreviewProps) {
   const {
     logoPosition,
@@ -27,6 +28,7 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
     primaryColor,
     fontSize
   } = settings;
+
   const spacingClass = mode === 'compact' ? 'py-1' : 'py-3';
   const borderClass = showBorders ? 'border border-zinc-200 p-4 rounded-lg' : '';
   const dividerClass = showDividers ? 'border-b border-zinc-100' : '';
@@ -45,16 +47,7 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
               logoPosition === 'center' && "items-center",
               logoPosition === 'right' && "items-end"
             )}>
-              {LogoAgency ? (
-                <LogoAgency />
-              ) : (
-                <div
-                  className="bg-zinc-100 items-center justify-center rounded-lg border-2 border-dashed border-zinc-200"
-                  style={{ width: logoSize, height: logoSize * 0.6 }}
-                >
-                  <span className="text-[10px] font-bold text-zinc-400 uppercase">Logo Placeholder</span>
-                </div>
-              )}
+              <LogoAgency logoSize={logoSize} logoPosition={logoPosition} />
 
               {/* IATA Logo */}
               {(data.show_iata_logo !== undefined ? data.show_iata_logo : settings.showIataLogo) && (
@@ -65,7 +58,6 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                     style={{ width: logoSize * 0.8 }}
                     referrerPolicy="no-referrer"
                     onError={(e) => {
-                      // Fallback if API_URL is not accessible
                       (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/en/thumb/0/00/IATA_logo.svg/1200px-IATA_logo.svg.png';
                     }}
                   />
@@ -156,65 +148,74 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
         return (
           <div key="flight" className={cn(spacingClass, dividerClass)}>
             <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4 text-center">Flugdetails</h3>
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">Hinflug</h3>
-            <div className="space-y-4">
-              {data.flight_details.segmentsTo?.map((s, i) => (
-                <div key={i} className={cn("grid grid-cols-4 gap-4 items-center", borderClass)}>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded">
-                      <Printer size={16} />
+            
+            {data.flight_details.segmentsTo && data.flight_details.segmentsTo.length > 0 && (
+              <>
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">Hinflug</h3>
+                <div className="space-y-4 mb-6">
+                  {data.flight_details.segmentsTo.map((s, i) => (
+                    <div key={i} className={cn("grid grid-cols-4 gap-4 items-center", borderClass)}>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded">
+                          <Printer size={16} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-zinc-400 uppercase">Flug</p>
+                          <p className="font-bold">{s.flight_number}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Airline</p>
+                        <p className="font-bold">{data.flight_details.airline}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Strecke</p>
+                        <p className="font-bold">{s.from?.iata} → {s.to?.iata}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Zeit</p>
+                        <p className="font-bold">{s.departure_time}</p>
+                        <p className="font-bold">{s.arrival_time}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Flug</p>
-                      <p className="font-bold">{s.flight_number}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Datum</p>
-                    <p className="font-bold">{s.airline}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Strecke</p>
-                    <p className="font-bold">{s.from?.iata} → {s.to?.iata}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Zeit</p>
-                    <p className="font-bold">{s.departure_time}</p>
-                    <p className="font-bold">{s.arrival_time}</p>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            )}
 
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">Rückflug</h3>
-            <div className="space-y-4">
-              {data.flight_details.segmentsBack?.map((s, i) => (
-                <div key={i} className={cn("grid grid-cols-4 gap-4 items-center", borderClass)}>
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-emerald-50 text-emerald-600 rounded">
-                      <Printer size={16} />
+            {data.flight_details.segmentsBack && data.flight_details.segmentsBack.length > 0 && (
+              <>
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">Rückflug</h3>
+                <div className="space-y-4">
+                  {data.flight_details.segmentsBack.map((s, i) => (
+                    <div key={i} className={cn("grid grid-cols-4 gap-4 items-center", borderClass)}>
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded">
+                          <Printer size={16} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-bold text-zinc-400 uppercase">Flug</p>
+                          <p className="font-bold">{s.flight_number}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Airline</p>
+                        <p className="font-bold">{data.flight_details.airline}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Strecke</p>
+                        <p className="font-bold">{s.from?.iata} → {s.to?.iata}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Zeit</p>
+                        <p className="font-bold">{s.departure_time}</p>
+                        <p className="font-bold">{s.arrival_time}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-zinc-400 uppercase">Flug</p>
-                      <p className="font-bold">{s.flight_number}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Datum</p>
-                    <p className="font-bold">{s.airline}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Strecke</p>
-                    <p className="font-bold">{s.from?.iata} → {s.to?.iata}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-zinc-400 uppercase">Zeit</p>
-                    <p className="font-bold">{s.departure_time}</p>
-                    <p className="font-bold">{s.arrival_time}</p>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </>
+            )}
           </div>
         );
       }
@@ -233,7 +234,6 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
             </h3>
 
             <div className={cn("space-y-6", borderClass)}>
-
               {/* SATR 1 */}
               <div className="grid grid-cols-3 gap-6 items-start">
                 <div>
@@ -287,11 +287,11 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                   <p className="font-bold">{data.hotelDto.board_type}</p>
                 </div>
               </div>
-
             </div>
           </div>
         );
       }
+
       case 'package':
         if (!data.package_details) return null;
         return (
@@ -299,7 +299,7 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
             <div className={cn("space-y-4", borderClass)}>
               {/* Package Verpflegung */}
               {data.package_details.verpflegung && data.package_details.verpflegung.length > 0 && (
-                <div className="flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2">
                   {data.package_details.verpflegung.map((v, i) => (
                     <div key={i} className="flex items-center gap-1.5 px-2 py-1 bg-zinc-50 rounded border border-zinc-100 text-[10px] font-bold">
                       {v.type === 'breakfast' && <span className="text-amber-600">Frühstück</span>}

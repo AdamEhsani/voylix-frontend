@@ -1,14 +1,21 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { Building2 } from "lucide-react";
 import { useLogo } from "../contexts/LogoContext";
 
-export default function LogoAgency({ className = "" }) {
+interface LogoAgencyProps {
+  logoSize?: number;
+  logoPosition?: 'left' | 'center' | 'right';
+  className?: string;
+}
+
+export default function LogoAgency({ logoSize = 80, logoPosition = 'left', className = "" }: LogoAgencyProps) {
   const { logoUrl, loading } = useLogo();
   const [imgError, setImgError] = useState(false);
 
   return (
     <div
-      className={`relative w-20 h-20 dark:bg-zinc-800 rounded-3xl flex items-center justify-center text-zinc-400 overflow-hidden border-4 border-white dark:border-zinc-900 ${className}`}
+      className={`relative dark:bg-zinc-800 rounded-3xl flex items-center justify-center text-zinc-400 overflow-hidden border-4 border-white dark:border-zinc-900 ${className}`}
+      style={{ width: logoSize, height: logoSize }}
     >
       {!loading && logoUrl && !imgError ? (
         <img
@@ -18,7 +25,7 @@ export default function LogoAgency({ className = "" }) {
           onError={() => setImgError(true)}
         />
       ) : (
-        <Building2 size={40} />
+        <Building2 size={logoSize * 0.5} />
       )}
     </div>
   );

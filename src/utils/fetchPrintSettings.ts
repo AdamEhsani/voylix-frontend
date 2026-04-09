@@ -1,13 +1,12 @@
 import { InvoiceDesignerSettings } from '../types';
 import { mergePrintSettings } from './printSettings';
-
-const API_URL = 'https://api.voylix.de/api/PrintSetting/loadSetting';
+import { API_URL } from "../config/api";
 
 export async function fetchPrintSettings(): Promise<InvoiceDesignerSettings> {
   const token = localStorage.getItem('token');
 
   try {
-    const response = await fetch(API_URL, {
+    const response = await fetch(`${API_URL}/PrintSetting/loadSetting`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`

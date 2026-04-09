@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Loader2, Mail, Lock, AlertCircle, ArrowRight, Eye, EyeOff} from 'lucide-react';
 import { motion } from 'motion/react';
-const API_URL="https://api.voylix.de";
+import { API_URL } from "../config/api";
+
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,6 +25,7 @@ export function LoginPage() {
         headers: {
           'Content-Type': 'application/json'
         },
+        credentials: "include",
         body: JSON.stringify({
           email: email,
           password: password
@@ -42,6 +44,7 @@ export function LoginPage() {
         token: data.token,
         user: {
           email: email
+
         }
       });
 

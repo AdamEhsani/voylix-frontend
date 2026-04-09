@@ -23,9 +23,9 @@ const menuItems = [
   { icon: Users, label: 'Kundenverwaltung', path: '/customers' },
   { icon: Coins, label: 'Token-System', path: '/tokens' },
   // { icon: UploadCloud, label: 'Dokumente', path: '/documents' },
-  { icon: Building2, label: 'Agenturprofil', path: '/agency' },
   { icon: Layout, label: 'Invoice Designer', path: '/invoices/designer' },
-  { icon: Settings, label: 'Einstellungen', path: '/settings' },
+  { icon: Building2, label: 'Agenturprofil', path: '/agency' },
+ // { icon: Settings, label: 'Einstellungen', path: '/settings' },
 ];
 
 export function Sidebar() {

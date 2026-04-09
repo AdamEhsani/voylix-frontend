@@ -3,8 +3,8 @@ import { InvoiceRenderer } from '../components/InvoiceRenderer';
 import { TravelInvoice, PaymentEntry } from '../types';
 import { Printer, Download, ArrowLeft, Share2, CreditCard, Landmark, Banknote, Train, Check, AlertCircle, Loader2 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { formatCurrency, cn } from '../utils';
-const API_URL="https://api.voylix.de";
+import { API_URL } from "../config/api";
+
 export function InvoiceDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();

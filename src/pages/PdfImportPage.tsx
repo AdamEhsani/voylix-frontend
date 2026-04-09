@@ -10,7 +10,8 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { cn } from '../utils';
-const API_URL="https://api.voylix.de";
+import { API_URL } from "../config/api";
+
 export function PdfImportPage() {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);

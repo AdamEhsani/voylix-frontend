@@ -1,3 +1,4 @@
+import { API_URL } from "../config/api";
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Building2, 
@@ -9,10 +10,14 @@ import {
   Clock,
   Save,
   Camera,
-  Loader2
+  Loader2,
+  Lock,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-const API_URL="https://api.voylix.de";
+
+// Using API_BASE_URL from utils as API_URL to match user's logic
 
 export function AgencyProfilePage() {
   const { user } = useAuth();
@@ -37,6 +42,19 @@ export function AgencyProfilePage() {
     bic: '',
     bankName: '',
   });
+
+  const [passwordForm, setPasswordForm] = useState({
+    email: '',
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [showPasswords, setShowPasswords] = useState({
+    old: false,
+    new: false,
+    confirm: false
+  });
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   useEffect(() => {
     const fetchAgency = async () => {
@@ -71,11 +89,12 @@ export function AgencyProfilePage() {
           bankName: data.bankName || '',
         });
 
-if (data.logoPath) {
-  const cleanPath = normalizePath(data.logoPath);
-  
-  setLogoPreview(`${API_URL}${cleanPath}`);
-}
+        setPasswordForm(prev => ({ ...prev, email: data.email || '' }));
+
+        if (data.logoPath) {
+          const cleanPath = normalizePath(data.logoPath);
+          setLogoPreview(`${API_URL}${cleanPath}`);
+        }
       } catch (err) {
         console.error("Fehler beim Laden der Agentur:", err);
       } finally {
@@ -87,8 +106,8 @@ if (data.logoPath) {
   }, []);
 
   const normalizePath = (path: string) => {
-  return path.replace(/^\/?wwwroot/, "");
-};
+    return path.replace(/^\/?wwwroot/, "");
+  };
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -155,6 +174,50 @@ if (data.logoPath) {
       alert(err.message || "Fehler beim Speichern");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      alert("Passwörter stimmen nicht überein.");
+      return;
+    }
+
+    try {
+      setPasswordLoading(true);
+      const token = localStorage.getItem("token");
+
+      const response = await fetch(`${API_URL}/api/Agency/newPassword`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: passwordForm.email,
+          CurrentPassword: passwordForm.oldPassword,
+          newPassword: passwordForm.newPassword
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || "Fehler beim Ändern des Passworts");
+      }
+
+      alert("Passwort erfolgreich geändert.");
+      setPasswordForm(prev => ({
+        ...prev,
+        oldPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      }));
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Fehler beim Ändern des Passworts");
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -226,26 +289,6 @@ if (data.logoPath) {
               </div>
             </div>
           </div>
-
-          {/* <div className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-6 flex items-center gap-2">
-              <Clock size={20} className="text-zinc-400" /> Geschäftszeiten
-            </h3>
-            <div className="space-y-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Mo - Fr</span>
-                <span className="font-medium">09:00 - 18:00</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">Sa</span>
-                <span className="font-medium">10:00 - 14:00</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-500">So</span>
-                <span className="font-medium text-red-500">Geschlossen</span>
-              </div>
-            </div>
-          </div> */}
         </div>
 
         {/* Right Column: Forms */}
@@ -417,6 +460,95 @@ if (data.logoPath) {
               </div>
             </div>
           </div>
+
+                    {/* Password Change */}
+          <div className="bg-white dark:bg-zinc-900 p-8 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-white mb-8 flex items-center gap-2">
+              <Lock size={20} className="text-zinc-400" /> Passwort ändern
+            </h3>
+            <form onSubmit={handlePasswordChange} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-500">E-Mail</label>
+                  <input 
+                    type="email" 
+                    value={passwordForm.email}
+                    onChange={(e) => setPasswordForm(prev => ({ ...prev, email: e.target.value }))}
+                    required
+                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-500">Aktuelles Passwort</label>
+                  <div className="relative">
+                    <input 
+                      type={showPasswords.old ? "text" : "password"}
+                      value={passwordForm.oldPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, oldPassword: e.target.value }))}
+                      required
+                      className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, old: !prev.old }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                    >
+                      {showPasswords.old ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-500">Neues Passwort</label>
+                  <div className="relative">
+                    <input 
+                      type={showPasswords.new ? "text" : "password"}
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
+                      required
+                      className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                    >
+                      {showPasswords.new ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-500">Passwort bestätigen</label>
+                  <div className="relative">
+                    <input 
+                      type={showPasswords.confirm ? "text" : "password"}
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      required
+                      className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+                    >
+                      {showPasswords.confirm ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button 
+                  type="submit"
+                  disabled={passwordLoading}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 font-bold rounded-xl hover:opacity-90 transition-all disabled:opacity-50"
+                >
+                  {passwordLoading ? <Loader2 size={18} className="animate-spin" /> : <Lock size={18} />}
+                  {passwordLoading ? "Wird geändert..." : "Passwort aktualisieren"}
+                </button>
+              </div>
+            </form>
+          </div>
+
         </div>
       </div>
     </div>

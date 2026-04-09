@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'; import { Search, Filter, FileText, Download, Eye, MoreVertical, Calendar, ChevronLeft, ChevronRight, Plus, Plane, Landmark, Briefcase } from 'lucide-react'; import { Link } from 'react-router-dom'; import { formatCurrency, cn } from '../utils';
-
+import { API_URL } from "../config/api";
 export function InvoicesPage() {
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -8,7 +8,7 @@ export function InvoicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-const API_URL="https://api.voylix.de";
+
   useEffect(() => {
     loadInvoices();
   }, []);
