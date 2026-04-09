@@ -29,7 +29,7 @@ export default function App() {
           <LogoProvider>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
-
+              
               <Route element={<DashboardLayout />}>
                 <Route path="/" element={<DashboardPage />} />
                 <Route path="/customers" element={<CustomersPage />} />

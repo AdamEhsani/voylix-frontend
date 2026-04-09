@@ -1,26 +1,30 @@
-import { createContext, useContext, useEffect, useState } from "react";
 import { API_URL } from "../config/api";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { useAuth } from "./AuthContext";
 
 type LogoContextType = {
   logoUrl: string | null;
   loading: boolean;
 };
+
 const LogoContext = createContext<LogoContextType>({
   logoUrl: null,
   loading: true,
 });
 
 export function LogoProvider({ children }: { children: React.ReactNode }) {
+  const { token } = useAuth();
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     if (!token) {
+      setLogoUrl(null);
       setLoading(false);
       return;
     }
 
+    setLoading(true);
     const url = `${API_URL}/uploads/logo/agency?token=${token}`;
 
     const img = new Image();
@@ -35,7 +39,7 @@ export function LogoProvider({ children }: { children: React.ReactNode }) {
       setLogoUrl(null);
       setLoading(false);
     };
-  }, []);
+  }, [token]);
 
   return (
     <LogoContext.Provider value={{ logoUrl, loading }}>
