@@ -130,6 +130,8 @@ export interface TravelInvoice {
     company_name: string;
     company_type: string;
     address: Address;
+    email: string;
+    phone: string;
   };
   booking: {
     booking_date: string;

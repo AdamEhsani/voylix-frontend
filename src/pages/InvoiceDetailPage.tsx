@@ -1,9 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { API_URL } from '../config/api';
+import React, { useState, useEffect, useRef } from 'react';
 import { InvoiceRenderer } from '../components/InvoiceRenderer';
-import { TravelInvoice, PaymentEntry } from '../types';
-import { Printer, Download, ArrowLeft, Share2, CreditCard, Landmark, Banknote, Train, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { InvoicePreview } from '../components/InvoicePreview';
+import { ShareModal } from '../components/ShareModel';
+import { TravelInvoice, PaymentEntry, InvoiceDesignerSettings } from '../types';
+import { Printer, Download, ArrowLeft, Share2, CreditCard, Landmark, Banknote, Train, Check, AlertCircle, Loader2, Ban } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { API_URL } from "../config/api";
+import { formatCurrency, cn } from '../utils';
+import { generateInvoicePdf } from '../utils/pdfExport';
+import { toast } from 'sonner';
 
 export function InvoiceDetailPage() {
   const { id } = useParams();
@@ -12,7 +17,17 @@ export function InvoiceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('Überweisung');
+  const [paymentDate, setPaymentDate] = useState(new Date().toLocaleDateString('de-DE'));
   const [isSaving, setIsSaving] = useState(false);
+  const [isStornieren, setIsStornieren] = useState(false);
+
+  // Share state
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isPreparingShare, setIsPreparingShare] = useState(false);
+  const [shareFileData, setShareFileData] = useState<{ base64: string; fileName: string } | null>(null);
+  const [printSettings, setPrintSettings] = useState<InvoiceDesignerSettings | null>(null);
+  const [agencyLogoPath, setAgencyLogoPath] = useState<string | null>(null);
+  const sharePreviewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -31,18 +46,17 @@ export function InvoiceDetailPage() {
         if (!res.ok) throw new Error("Failed to fetch invoice data");
 
         const file = await res.json();
-
+        
         // Ensure the data structure matches TravelInvoice
-        const extractedData =
-          typeof file.extractedJson === "string"
-            ? JSON.parse(file.extractedJson)
-            : file.extractedJson;
-
+        const extractedData = typeof file.extractedJson === 'string' 
+          ? JSON.parse(file.extractedJson) 
+          : file.extractedJson || {};
+        
         // Robust initialization of payments object
         const payments = {
-          invoice_total: Number(extractedData.payments?.invoice_total) || 0,
-          invoice_paid_amount: Number(extractedData.payments?.invoice_paid_amount) || 0,
-          invoice_balance: Number(extractedData.payments?.invoice_balance) || 0,
+          invoice_total: extractedData.payments?.invoice_total || 0,
+          invoice_paid_amount: extractedData.payments?.invoice_paid_amount || 0,
+          invoice_balance: extractedData.payments?.invoice_balance || 0,
           currency: extractedData.payments?.currency || "EUR",
           payment_method: extractedData.payments?.payment_method || "Überweisung",
           payment_date: extractedData.payments?.payment_date || null,
@@ -50,9 +64,19 @@ export function InvoiceDetailPage() {
           entries: extractedData.payments?.entries || []
         };
 
+        // Robust initialization of customer object
+        const customer = {
+          customer_number: extractedData.customer?.customer_number || "",
+          company_name: extractedData.customer?.company_name || file.customerName || "",
+          company_type: extractedData.customer?.company_type || "",
+          email: extractedData.customer?.email || file.customerEmail || file.email || "",
+          phone: extractedData.customer?.phone || file.customerPhone || file.phone || "",
+          address: extractedData.customer?.address || { street: "", PostalCode: "", city: "", country: "" }
+        };
         setData({
-          ...extractedData, 
+          ...extractedData,
           id: id,
+          customer: customer,
           payments: payments
         });
       } catch (error) {
@@ -74,16 +98,16 @@ export function InvoiceDetailPage() {
 
   const handleSavePayment = async () => {
     if (!amount || parseFloat(amount) <= 0 || !data) return;
-
+    
     setIsSaving(true);
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 800));
-
+    
     const newEntry: PaymentEntry = {
       id: Math.random().toString(36).substr(2, 9),
       amount: parseFloat(amount),
       method: method,
-      date: new Date().toLocaleDateString('de-DE'),
+      date: paymentDate,
       status: 'paid'
     };
 
@@ -91,7 +115,7 @@ export function InvoiceDetailPage() {
       if (!prev) return null;
       const newPaidAmount = (Number(prev.payments.invoice_paid_amount) || 0) + newEntry.amount;
       const newBalance = (Number(prev.payments.invoice_total) || 0) - newPaidAmount;
-
+      
       return {
         ...prev,
         payments: {
@@ -105,6 +129,39 @@ export function InvoiceDetailPage() {
 
     setAmount('');
     setIsSaving(false);
+  };
+
+  const handleStornieren = async () => {
+    if (!data || !id) return;
+    if (!window.confirm("Möchten Sie diese Rechnung wirklich stornieren?")) return;
+
+    setIsStornieren(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_URL}/api/SaveInvoice/storno/${id}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        toast.success("Rechnung wurde storniert.");
+        setData(prev => prev ? { ...prev, payments: { ...prev.payments, invoice_status: 'storniert' } } : null);
+      } else {
+        throw new Error("Fehler beim Stornieren.");
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setIsStornieren(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!data) return;
+    
+    // Just open the modal now, it will handle PDF generation if needed or we can do it here
+    // User wants a "toolbar" like new invoice.
+    setIsShareModalOpen(true);
   };
 
   if (loading) {
@@ -130,7 +187,7 @@ export function InvoiceDetailPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
         <div className="flex items-center gap-4">
-          <button
+          <button 
             onClick={() => navigate(-1)}
             className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
           >
@@ -142,8 +199,20 @@ export function InvoiceDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
-            <Share2 size={16} /> Teilen
+          <button 
+            onClick={handleStornieren}
+            disabled={isStornieren || data.payments.invoice_status === 'storniert'}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/50 rounded-lg hover:bg-red-100 transition-colors disabled:opacity-50"
+          >
+            {isStornieren ? <Loader2 size={16} className="animate-spin" /> : <Ban size={16} />}
+            Stornieren
+          </button>
+          <button 
+            onClick={handleShare}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
+          >
+            <Share2 size={16} />
+            Teilen
           </button>
           <button className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors">
             <Download size={16} /> PDF
@@ -151,10 +220,67 @@ export function InvoiceDetailPage() {
         </div>
       </div>
 
+      {/* Hidden container for background PDF generation */}
+      <div className="fixed left-[-9999px] top-0 pointer-events-none overflow-hidden">
+        <div ref={sharePreviewRef} style={{ width: '210mm' }}>
+          {data && printSettings && (
+            <InvoicePreview 
+              data={data} 
+              settings={printSettings} 
+              agencyLogoPath={agencyLogoPath} 
+            />
+          )}
+        </div>
+      </div>
+
+      {isShareModalOpen && data && (
+        <ShareModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          invoiceData={{
+            id: id || '',
+            number: data.invoice_meta?.invoice_number || '',
+            customerName: data.customer?.company_name || '',
+            customerEmail: data.customer?.email || '',
+            customerPhone: data.customer?.phone || '',
+          }}
+          // Pass necessary refs/data for background PDF generation inside modal
+          onPreparePdf={async () => {
+            const token = localStorage.getItem("token");
+            let settings = printSettings;
+            if (!settings) {
+              const settingsRes = await fetch(`${API_URL}/api/PrintSetting`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              if (settingsRes.ok) {
+                settings = await settingsRes.json();
+                setPrintSettings(settings);
+              }
+            }
+            if (!agencyLogoPath) {
+              const agencyRes = await fetch(`${API_URL}/api/Agency`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              if (agencyRes.ok) {
+                const agencyData = await agencyRes.json();
+                setAgencyLogoPath(agencyData.logoPath);
+              }
+            }
+            await new Promise(resolve => setTimeout(resolve, 300));
+            if (sharePreviewRef.current && settings) {
+              const fileName = `Rechnung_${data.invoice_meta?.invoice_number || id}.pdf`;
+              const result = await generateInvoicePdf(sharePreviewRef.current, fileName);
+              return { ...result, fileName };
+            }
+            throw new Error("PDF could not be generated");
+          }}
+        />
+      )}
+
       <div className="max-w-5xl mx-auto pb-20">
-        <InvoiceRenderer
-          data={data}
-          onUpdate={setData}
+        <InvoiceRenderer 
+          data={data} 
+          onUpdate={setData} 
           onSave={() => {
             setIsSaving(true);
             setTimeout(() => {
@@ -164,82 +290,6 @@ export function InvoiceDetailPage() {
           }}
         />
 
-        {/* Payment Form - Keep it as a separate section for professional bookkeeping */}
-
-
-        {/* <div className="mt-8 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden print:hidden">
-          <div className="p-6 border-b border-zinc-100 dark:border-zinc-800">
-            <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Zahlung erfassen</h3>
-            <p className="text-sm text-zinc-500">Buchen Sie eine neue Zahlung für diese Rechnung</p>
-          </div>
-
-          <div className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Mablagh Faktor (Betrag)</label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold text-zinc-400">€</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full pl-10 pr-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-2xl font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                  />
-                </div>
-              </div>
-
-
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Raveshe Pardakht (Zahlungsart)</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {paymentMethods.map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => setMethod(m.id)}
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left",
-                        method === m.id
-                          ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/10 text-emerald-600"
-                          : "border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700 text-zinc-600 dark:text-zinc-400"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center",
-                        method === m.id ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-zinc-100 dark:bg-zinc-800"
-                      )}>
-                        <m.icon size={16} />
-                      </div>
-                      <span className="font-bold text-xs">{m.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-zinc-100 dark:border-zinc-800">
-              <div className="flex items-center gap-2 text-xs text-zinc-500">
-                <AlertCircle size={14} />
-                <span>Zahlung wird sofort im Verlauf oben angezeigt</span>
-              </div>
-              <button
-                onClick={handleSavePayment}
-                disabled={isSaving || !amount}
-                className="px-8 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
-              >
-                {isSaving ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <Check size={20} />
-                )}
-                Speichern
-              </button>
-            </div>
-          </div>
-        </div> */}
-        
       </div>
     </div>
   );

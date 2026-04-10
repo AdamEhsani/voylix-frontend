@@ -169,6 +169,18 @@ useEffect(() => {
             <p className="text-xs text-red-400 italic">Verbleibender Betrag: {formatCurrency(payments?.invoice_total - (payments?.invoice_balance || 0))}</p>
           </div>
 
+              {/* Date Input */}
+              <div className="space-y-3">
+                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Datum</label>
+                <input 
+                  type="text"
+                  value={payments?.payment_date || ''}
+                  onChange={(e) => formatCurrency(payments?.payment_date || '')}
+                  placeholder="DD.MM.YYYY"
+                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-lg font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                />
+              </div>
+
           {/* Payment Method Selection */}
           <div className="space-y-3">
             <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Raveshe Pardakht (Zahlungsart)</label>

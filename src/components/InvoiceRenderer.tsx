@@ -1,14 +1,7 @@
-import {
-  TravelInvoice,
-  Passenger,
-  FlightSegment,
-  InvoiceMeta,
-  Address,
-  BackendCustomer,
-  Hotel,
-  InvoiceDesignerSettings
-} from '../types'
-import { cn, formatCurrency } from '../utils'
+import { API_URL } from "../config/api";
+import { TravelInvoice, Passenger, Customer, FlightSegment, InvoiceMeta, Address, BackendCustomer, InvoiceDesignerSettings } from '../types'
+import { formatCurrency, cn } from '../utils'
+import { InvoicePreview } from './InvoicePreview'
 import {
   Plane,
   User,
@@ -28,13 +21,9 @@ import {
   Utensils,
   GlassWater,
   Truck,
-  Ban,
-  Building2
+  Ban
 } from 'lucide-react'
-import { useState, useEffect, useCallback } from 'react'
-import LogoAgency from './LogoAgency'
-import { API_URL } from "../config/api";
-import { InvoicePreview } from './InvoicePreview'
+import React, { useState, useEffect } from 'react'
 
 interface InvoiceRendererProps {
   data?: TravelInvoice
@@ -43,25 +32,25 @@ interface InvoiceRendererProps {
 }
 
 export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps) {
-
   if (!data) return null
-
   const invoiceMeta: InvoiceMeta = data.invoice_meta ?? {
-    invoice_type: 'travel_invoice',
+    invoice_type: 'Flug',
     invoice_number: '',
     invoice_date: '',
     booking_reference: '',
     va_reference: '',
     language: 'de'
   }
-
+  
   const customer = data.customer ?? {
     customer_number: '',
     company_name: '',
     company_type: '',
+    email: '',
+    phone: '',
     address: {
       street: '',
-      postal_code: '',
+      postalCode: '',
       city: '',
       country: ''
     }
@@ -69,7 +58,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
   const address: Address = customer.address ?? {
     street: '',
-    postal_code: '',
+    postalCode: '',
     city: '',
     country: ''
   }
@@ -232,7 +221,6 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       updated[index].full_name =
         `${updated[index].first_name} ${updated[index].last_name}`.trim()
     }
-
     onUpdate({ ...data, passengers: updated })
   }
 
@@ -408,6 +396,8 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
           customer_number: `C-${selected.id}`,
           company_name: fullName,
           company_type: '',
+          email: selected.email,
+          phone: selected.phone,
           address: {
             street: selected.street,
             postalCode: selected.postalCode,
@@ -562,7 +552,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
               <Briefcase size={20} />
             </div>
             <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">
-              {invoiceMeta?.invoice_type === 'travel_invoice'
+              {invoiceMeta?.invoice_type === 'Flug'
                 ? 'Reise-Rechnung'
                 : 'Rechnung'}
             </h2>
@@ -630,7 +620,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Name / Firma</label>
             <input
@@ -638,6 +628,24 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
               onChange={e => updateCustomer('company_name', e.target.value)}
               className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
               placeholder="Max Mustermann"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">E-Mail</label>
+            <input
+              value={customer?.email ?? ''}
+              onChange={e => updateCustomer('email', e.target.value)}
+              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
+              placeholder="max@mustermann.de"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Telefon</label>
+            <input
+              value={customer?.phone ?? ''}
+              onChange={e => updateCustomer('phone', e.target.value)}
+              className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
+              placeholder="+49 123 456789"
             />
           </div>
           <div className="space-y-1.5">
@@ -793,12 +801,12 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-zinc-400 uppercase">Datum</label>
+                        <label className="text-[9px] font-bold text-zinc-400 uppercase">Airline</label>
                         <input
                           value={s.airline ?? ''}
                           onChange={e => updateFlightSegment('segmentsTo', i, 'airline', e.target.value)}
                           className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                          placeholder="DD.MM.YYYY"
+                          placeholder="Lufthansa"
                         />
                       </div>
                     </div>
@@ -809,7 +817,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                           value={s.from?.airport ?? ''}
                           onChange={e => updateFlightSegment('segmentsTo', i, 'from.airport', e.target.value)}
                           className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                          placeholder="FRA"
+                          placeholder="Frankfurt"
                         />
                       </div>
                       <div className="space-y-1">
@@ -818,7 +826,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                           value={s.to?.airport ?? ''}
                           onChange={e => updateFlightSegment('segmentsTo', i, 'to.airport', e.target.value)}
                           className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                          placeholder="IST"
+                          placeholder="Istanbul"
                         />
                       </div>
                     </div>
@@ -829,7 +837,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                           value={s.departure_time ?? ''}
                           onChange={e => updateFlightSegment('segmentsTo', i, 'departure_time', e.target.value)}
                           className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                          placeholder="HH:MM"
+                          placeholder="HH:MM dd.mm.yyyy"
                         />
                       </div>
                       <div className="space-y-1">
@@ -838,7 +846,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                           value={s.arrival_time ?? ''}
                           onChange={e => updateFlightSegment('segmentsTo', i, 'arrival_time', e.target.value)}
                           className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                          placeholder="HH:MM"
+                          placeholder="HH:MM dd.mm.yyyy"
                         />
                       </div>
                     </div>
@@ -873,12 +881,12 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[9px] font-bold text-zinc-400 uppercase">Datum</label>
+                        <label className="text-[9px] font-bold text-zinc-400 uppercase">Airline</label>
                         <input
                           value={s.airline ?? ''}
-                          onChange={e => updateFlightSegment('segmentsBack', i, 'date', e.target.value)}
+                          onChange={e => updateFlightSegment('segmentsBack', i, 'airline', e.target.value)}
                           className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                          placeholder="DD.MM.YYYY"
+                          placeholder="Lufthansa"
                         />
                       </div>
                     </div>
@@ -889,7 +897,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                           value={s.from?.airport ?? ''}
                           onChange={e => updateFlightSegment('segmentsBack', i, 'from.airport', e.target.value)}
                           className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                          placeholder="IST"
+                          placeholder="Istanbul"
                         />
                       </div>
                       <div className="space-y-1">
@@ -898,7 +906,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                           value={s.to?.airport ?? ''}
                           onChange={e => updateFlightSegment('segmentsBack', i, 'to.airport', e.target.value)}
                           className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                          placeholder="FRA"
+                          placeholder="Frankfurt"
                         />
                       </div>
                     </div>
@@ -909,7 +917,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                           value={s.departure_time ?? ''}
                           onChange={e => updateFlightSegment('segmentsBack', i, 'departure_time', e.target.value)}
                           className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                          placeholder="HH:MM"
+                          placeholder="HH:MM dd.mm.yyyy"
                         />
                       </div>
                       <div className="space-y-1">
@@ -918,7 +926,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                           value={s.arrival_time ?? ''}
                           onChange={e => updateFlightSegment('segmentsBack', i, 'arrival_time', e.target.value)}
                           className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                          placeholder="HH:MM"
+                          placeholder="HH:MM dd.mm.yyyy"
                         />
                       </div>
                     </div>
@@ -1062,7 +1070,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       )}
 
       {/* PACKAGE DETAILS */}
-      {(invoiceMeta.invoice_type === 'package_invoice' || invoiceMeta.invoice_type === 'travel_invoice') && (
+      {(invoiceMeta.invoice_type === 'Package') && (
         <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 space-y-6">
           <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
             <Globe size={14} /> Pauschalreise Details

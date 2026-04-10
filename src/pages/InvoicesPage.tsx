@@ -1,23 +1,50 @@
-import { useState, useEffect } from 'react'; import { Search, Filter, FileText, Download, Eye, MoreVertical, Calendar, ChevronLeft, ChevronRight, Plus, Plane, Landmark, Briefcase } from 'lucide-react'; import { Link } from 'react-router-dom'; import { formatCurrency, cn } from '../utils';
+import { useState, useEffect } from 'react';
+import { 
+  Search, 
+  Filter, 
+  FileText, 
+  Download, 
+  Eye, 
+  MoreVertical,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Plane,
+  Landmark,
+  Briefcase,
+  Loader2,
+  AlertCircle
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { formatCurrency, cn } from '../utils';
 import { API_URL } from "../config/api";
-export function InvoicesPage() {
+interface Invoice {
+  id: string;
+  number: string;
+  customer: string;
+  date: string;
+  amount: number;
+  status: string;
+  type: string;
+}
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [invoices, setInvoices] = useState<any[]>([]);
+export function InvoicesPage() {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
 
-  useEffect(() => {
-    loadInvoices();
-  }, []);
-
   const loadInvoices = async () => {
     try {
-
+      setLoading(true);
+      setError(null);
       const token = localStorage.getItem("token");
 
+      // Note: Using the URL provided by the user. 
+      // In a real app, this might be an environment variable.
       const res = await fetch(`${API_URL}/api/uploadedFiles`, {
         method: "GET",
         headers: {
@@ -33,11 +60,11 @@ export function InvoicesPage() {
       const data = await res.json();
 
       const mapped = data.map((file: any) => {
-
         const json =
           typeof file.extractedJson === "string"
             ? JSON.parse(file.extractedJson)
             : file.extractedJson || {};
+
         return {
           id: file.id,
           number: json?.invoice_meta?.invoice_number ?? `INV-${file.id}`,
@@ -54,23 +81,27 @@ export function InvoicesPage() {
         };
       });
 
-
       setInvoices(mapped);
-
-    } catch (err) {
-      console.error("Invoice load error:", err);
+    } catch (err: any) {
+      console.error("Error loading invoices:", err);
+      setError(err.message || "An error occurred while loading invoices");
+      // Fallback to empty list or mock data if needed for demo purposes
+      // setInvoices([]); 
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredInvoices = invoices.filter(inv =>
+  useEffect(() => {
+    loadInvoices();
+  }, []);
+
+  const filteredInvoices = invoices.filter(inv => 
     inv.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
     inv.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
     inv.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
     inv.status.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
 
   // Pagination logic
   const totalItems = filteredInvoices.length;
@@ -80,34 +111,20 @@ export function InvoicesPage() {
   const currentInvoices = filteredInvoices.slice(startIndex, startIndex + itemsPerPage);
 
   const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "Flug":
-        return <Plane size={14} />;
-      case "Hotel":
-        return <Landmark size={14} />;
-      case "Package":
-        return <Briefcase size={14} />;
-      default:
-        return null;
-    }
+    const normalizedType = type.toLowerCase();
+    if (normalizedType.includes('flug')) return <Plane size={14} />;
+    if (normalizedType.includes('hotel')) return <Landmark size={14} />;
+    if (normalizedType.includes('pauschal')) return <Briefcase size={14} />;
+    return <FileText size={14} />;
   };
 
   const getTypeStyles = (type: string) => {
-    switch (type) {
-      case "Flug":
-        return "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400";
-      case "Hotel":
-        return "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400";
-      case "Package":
-        return "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400";
-      default:
-        return "bg-zinc-50 dark:bg-zinc-900/20 text-zinc-600 dark:text-zinc-400";
-    }
+    const normalizedType = type.toLowerCase();
+    if (normalizedType.includes('flug')) return "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400";
+    if (normalizedType.includes('hotel')) return "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400";
+    if (normalizedType.includes('pauschal')) return "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400";
+    return "bg-zinc-50 dark:bg-zinc-900/20 text-zinc-600 dark:text-zinc-400";
   };
-
-  if (loading) {
-    return <div className="p-6">Loading invoices...</div>;
-  }
 
   return (
     <div className="space-y-6">
@@ -117,7 +134,7 @@ export function InvoicesPage() {
           <p className="text-zinc-500 dark:text-zinc-400">Verwalten und verfolgen Sie alle Ihre Reiseabrechnungen.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
+          <Link 
             to="/pdf-import"
             className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-sm"
           >
@@ -128,7 +145,7 @@ export function InvoicesPage() {
               <Plus size={20} /> Neue Rechnung
             </button>
             <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
-              <Link
+              <Link 
                 to="/invoices/new/flight"
                 className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-b border-zinc-100 dark:border-zinc-800"
               >
@@ -137,7 +154,7 @@ export function InvoicesPage() {
                 </div>
                 Flug
               </Link>
-              <Link
+              <Link 
                 to="/invoices/new/hotel"
                 className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-b border-zinc-100 dark:border-zinc-800"
               >
@@ -146,7 +163,7 @@ export function InvoicesPage() {
                 </div>
                 Hotel
               </Link>
-              <Link
+              <Link 
                 to="/invoices/new/package"
                 className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
               >
@@ -203,79 +220,110 @@ export function InvoicesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {filteredInvoices.map((inv) => (
-                <tr key={inv.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600">
-                        <FileText size={16} />
-                      </div>
-                      <span className="text-sm font-bold text-zinc-900 dark:text-white">{inv.number}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className={cn(
-                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider",
-                      getTypeStyles(inv.type)
-                    )}>
-                      {getTypeIcon(inv.type)}
-                      {inv.type}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-zinc-600 dark:text-zinc-400">{inv.customer}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-zinc-500">{inv.date}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-bold text-zinc-900 dark:text-white">{formatCurrency(inv.amount)}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <Link
-                      to={inv.status === "bezahlt" ? "#" : `/payment/${inv.id}`}
-                      onClick={(e) => {
-                        if (inv.status === "bezahlt") e.preventDefault();
-                      }}
-
-                      // to={`/payment/${inv.id}`}
-                      className={cn(
-                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer",
-                        inv.status === 'bezahlt' ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" :
-                          inv.status === 'offen' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" :
-                            "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
-                      )}
-                    >
-                      {inv.status}
-                    </Link>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link
-                        to={`/invoices/${inv.id}`}
-                        className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
-                        title="Ansehen"
-                      >
-                        <Eye size={18} />
-                      </Link>
-                      {/* <button className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">
-                        <MoreVertical size={18} />
-                      </button> */}
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+                      <p className="text-sm text-zinc-500">Rechnungen werden geladen...</p>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : error ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <AlertCircle className="w-8 h-8 text-red-500" />
+                      <p className="text-sm text-red-500 font-medium">{error}</p>
+                      <button 
+                        onClick={loadInvoices}
+                        className="mt-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg text-xs font-bold hover:bg-zinc-200 transition-colors"
+                      >
+                        Erneut versuchen
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : currentInvoices.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <FileText className="w-8 h-8 text-zinc-300" />
+                      <p className="text-sm text-zinc-500">Keine Rechnungen gefunden.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                currentInvoices.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600">
+                          <FileText size={16} />
+                        </div>
+                        <span className="text-sm font-bold text-zinc-900 dark:text-white">{inv.number}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider",
+                        getTypeStyles(inv.type)
+                      )}>
+                        {getTypeIcon(inv.type)}
+                        {inv.type}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-zinc-600 dark:text-zinc-400">{inv.customer}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-zinc-500">{inv.date}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-bold text-zinc-900 dark:text-white">{formatCurrency(inv.amount)}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Link 
+                        to={inv.status === "bezahlt" || inv.status === "storniert" ? "#" : `/payment/${inv.id}`}
+                        className={cn(
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer",
+                          inv.status.toLowerCase() === 'bezahlt' ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" :
+                          inv.status.toLowerCase() === 'offen' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" :
+                          "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                        )}
+                      >
+                        {inv.status}
+                      </Link>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Link 
+                          to={`/invoices/${inv.id}`}
+                          className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
+                          title="Ansehen"
+                        >
+                          <Eye size={18} />
+                        </Link>
+                        <button className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">
+                          <MoreVertical size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
+
         {/* Pagination */}
         <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
           <p className="text-xs text-zinc-500">
             Zeige {totalItems === 0 ? 0 : startIndex + 1} bis {endIndex} von {totalItems} Rechnungen
           </p>
           <div className="flex items-center gap-2">
-            <button
-              className="p-1 text-zinc-400 hover:text-zinc-600 disabled:opacity-30"
+            <button 
+              className="p-1 text-zinc-400 hover:text-zinc-600 disabled:opacity-30" 
               disabled={currentPage === 1 || loading}
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             >
@@ -291,17 +339,17 @@ export function InvoicesPage() {
                     pageNum = totalPages - 4 + i;
                   }
                 }
-
+                
                 if (pageNum > totalPages || pageNum < 1) return null;
 
                 return (
-                  <button
+                  <button 
                     key={pageNum}
                     onClick={() => setCurrentPage(pageNum)}
                     className={cn(
                       "w-8 h-8 rounded-lg text-xs font-bold transition-all",
-                      currentPage === pageNum
-                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
+                      currentPage === pageNum 
+                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20" 
                         : "hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
                     )}
                   >
@@ -310,7 +358,7 @@ export function InvoicesPage() {
                 );
               })}
             </div>
-            <button
+            <button 
               className="p-1 text-zinc-400 hover:text-zinc-600 disabled:opacity-30"
               disabled={currentPage === totalPages || totalPages === 0 || loading}
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}

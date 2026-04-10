@@ -19,6 +19,8 @@ export function CreateHotelInvoicePage() {
       customer_number: "",
       company_name: "",
       company_type: "",
+      email: "",
+      phone: "",
       address: { street: "", postalCode: "", city: "", country: "" }
     },
     booking: {

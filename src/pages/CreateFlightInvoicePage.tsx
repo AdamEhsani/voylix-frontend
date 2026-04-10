@@ -19,13 +19,15 @@ export function CreateFlightInvoicePage() {
       customer_number: "",
       company_name: "",
       company_type: "",
+      email: "",
+      phone: "",
       address: { street: "", postalCode: "", city: "", country: "" }
     },
     booking: {
       booking_date: new Date().toLocaleDateString('de-DE'),
       travel_start_date: "",
       travel_end_date: "",
-      service_description: ""
+      services: []
     },
     passengers: [],
     flight_details: {

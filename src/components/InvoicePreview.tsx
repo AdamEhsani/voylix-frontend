@@ -1,8 +1,8 @@
-import React from 'react';
 import { API_URL } from "../config/api";
+import React from 'react';
 import { Printer } from 'lucide-react';
 import { InvoiceDesignerSettings, TravelInvoice } from '../types';
-import { cn,} from '../utils';
+import { cn} from '../utils';
 import LogoAgency from './LogoAgency';
 
 interface InvoicePreviewProps {
@@ -58,6 +58,7 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                     style={{ width: logoSize * 0.8 }}
                     referrerPolicy="no-referrer"
                     onError={(e) => {
+                      // Fallback if API_URL is not accessible
                       (e.target as HTMLImageElement).src = 'https://upload.wikimedia.org/wikipedia/en/thumb/0/00/IATA_logo.svg/1200px-IATA_logo.svg.png';
                     }}
                   />
@@ -106,8 +107,6 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                 <span className="font-bold">{data.invoice_meta?.invoice_number}</span>
                 <span className="text-zinc-400 font-medium">Datum:</span>
                 <span className="font-bold">{data.invoice_meta?.invoice_date}</span>
-                <span className="text-zinc-400 font-medium">Buchungscode:</span>
-                <span className="font-bold">{data.invoice_meta?.booking_reference}</span>
                 <span className="text-zinc-400 font-medium">Kundennummer:</span>
                 <span className="font-bold">{data.customer?.customer_number}</span>
               </div>
@@ -137,8 +136,7 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
 
         const shouldShowFlight =
           type === 'Flug' ||
-          type === 'Package' ||
-          type === 'travel_invoice';
+          type === 'Package';
 
         const hasFlightData =
           (data.flight_details?.segmentsTo?.length ?? 0) > 0 ||
@@ -166,11 +164,11 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                       </div>
                       <div>
                         <p className="text-[10px] font-bold text-zinc-400 uppercase">Airline</p>
-                        <p className="font-bold">{data.flight_details.airline}</p>
+                        <p className="font-bold">{s.airline || data.flight_details.airline}</p>
                       </div>
                       <div>
                         <p className="text-[10px] font-bold text-zinc-400 uppercase">Strecke</p>
-                        <p className="font-bold">{s.from?.iata} → {s.to?.iata}</p>
+                        <p className="font-bold">{s.from?.airport} → {s.to?.airport}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] font-bold text-zinc-400 uppercase">Zeit</p>
@@ -200,11 +198,11 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                       </div>
                       <div>
                         <p className="text-[10px] font-bold text-zinc-400 uppercase">Airline</p>
-                        <p className="font-bold">{data.flight_details.airline}</p>
+                        <p className="font-bold">{s.airline || data.flight_details.airline}</p>
                       </div>
                       <div>
                         <p className="text-[10px] font-bold text-zinc-400 uppercase">Strecke</p>
-                        <p className="font-bold">{s.from?.iata} → {s.to?.iata}</p>
+                        <p className="font-bold">{s.from?.airport} → {s.to?.airport}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[10px] font-bold text-zinc-400 uppercase">Zeit</p>
