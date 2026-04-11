@@ -57,13 +57,13 @@ export function InvoiceDetailPage() {
           invoice_total: extractedData.payments?.invoice_total || 0,
           invoice_paid_amount: extractedData.payments?.invoice_paid_amount || 0,
           invoice_balance: extractedData.payments?.invoice_balance || 0,
+          invoice_status: extractedData.payments?.invoice_status || "offen",
           currency: extractedData.payments?.currency || "EUR",
           payment_method: extractedData.payments?.payment_method || "Überweisung",
           payment_date: extractedData.payments?.payment_date || null,
           line_items: extractedData.payments?.line_items || [],
           entries: extractedData.payments?.entries || []
         };
-
         // Robust initialization of customer object
         const customer = {
           customer_number: extractedData.customer?.customer_number || "",

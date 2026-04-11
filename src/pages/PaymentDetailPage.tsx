@@ -33,60 +33,60 @@ export function PaymentDetailPage() {
     { id: 'Bar', icon: Banknote, label: 'Bar' },
   ];
 
-useEffect(() => {
-  const fetchInvoice = async () => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    const fetchInvoice = async () => {
+      try {
+        setLoading(true);
 
-      const token = localStorage.getItem("token");
+        const token = localStorage.getItem("token");
 
-      const response = await fetch(
-        `${API_URL}/api/Invoices/InvoiceUpdate/${id}`, 
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+        const response = await fetch(
+          `${API_URL}/api/Invoices/InvoiceUpdate/${id}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error("Fehler beim Laden");
         }
-      );
 
-      if (!response.ok) {
-        throw new Error("Fehler beim Laden");
-      }
+        const data = await response.json();
 
-      const data = await response.json();
+        // ✅ گرفتن فایل
+        const file = data?.fiel?.[0];
 
-      // ✅ گرفتن فایل
-      const file = data?.fiel?.[0];
-
-      // ✅ parse کردن extractedJson
-      let parsed = null;
-      if (file?.extractedJson) {
-        try {
-          parsed = JSON.parse(file.extractedJson);
-        } catch (e) {
-          console.error("JSON parse error", e);
+        // ✅ parse کردن extractedJson
+        let parsed = null;
+        if (file?.extractedJson) {
+          try {
+            parsed = JSON.parse(file.extractedJson);
+          } catch (e) {
+            console.error("JSON parse error", e);
+          }
         }
+
+        // ✅ گرفتن payments
+        const extractedPayments = parsed?.payments || null;
+
+        setInvoice(data);
+        setPayments(extractedPayments);
+
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      // ✅ گرفتن payments
-      const extractedPayments = parsed?.payments || null;
-
-      setInvoice(data);
-      setPayments(extractedPayments);
-
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    if (id) {
+      fetchInvoice();
     }
-  };
-
-  if (id) {
-    fetchInvoice();
-  }
-}, [id]);
+  }, [id]);
 
   const handleSave = async () => {
     if (!amount || parseFloat(amount) <= 0) return;
@@ -151,7 +151,7 @@ useEffect(() => {
         <div className="p-8 space-y-8">
           {/* Amount Input */}
           <div className="space-y-3">
-            <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Mablagh Faktor (Betrag)</label>
+            <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Betrag</label>
             <div className="relative">
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-zinc-400">€</span>
               <input
@@ -169,17 +169,21 @@ useEffect(() => {
             <p className="text-xs text-red-400 italic">Verbleibender Betrag: {formatCurrency(payments?.invoice_total - (payments?.invoice_balance || 0))}</p>
           </div>
 
-              {/* Date Input */}
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Datum</label>
-                <input 
-                  type="text"
-                  value={payments?.payment_date || ''}
-                  onChange={(e) => formatCurrency(payments?.payment_date || '')}
-                  placeholder="DD.MM.YYYY"
-                  className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-lg font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-                />
-              </div>
+          {/* Date Input */}
+          <div className="space-y-3">
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Datum</label>
+            <input
+              type="date"
+              value={payments?.payment_date || ''} // باید YYYY-MM-DD باشه
+              onChange={(e) => {
+                setPayments({
+                  ...payments,
+                  payment_date: e.target.value
+                });
+              }}
+              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-lg font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+            />
+          </div>
 
           {/* Payment Method Selection */}
           <div className="space-y-3">
