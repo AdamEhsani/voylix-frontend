@@ -43,7 +43,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
   }
 
   const customer = data.customer ?? {
-    customer_number: '',
+    customerNumber: '',
     company_name: '',
     company_type: '',
     email: '',
@@ -393,7 +393,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       onUpdate({
         ...data,
         customer: {
-          customer_number: `C-${selected.id}`,
+          customerNumber: `C-${selected.customerNumber}`,
           company_name: fullName,
           company_type: '',
           email: selected.email,
@@ -587,7 +587,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                   placeholder="DD.MM.YYYY"
                 />
               </div>
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+              {/* <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
                 <span className="text-[10px] text-zinc-500 uppercase font-bold">IATA Logo:</span>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-zinc-400">{data.show_iata_logo ? 'Ja' : 'Nein'}</span>
@@ -598,7 +598,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                     className="accent-emerald-500"
                   />
                 </div>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

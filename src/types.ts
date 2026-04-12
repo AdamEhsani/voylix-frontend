@@ -41,7 +41,7 @@ export interface Agency {
 
 export interface Customer {
   id: string;
-  customer_number: string | null;
+  customerNumber: string | null;
   name: string;
   company_name: string | null;
   address: Address;
@@ -126,7 +126,7 @@ export interface TravelInvoice {
   id?: string;
   invoice_meta: InvoiceMeta;
   customer: {
-    customer_number: string;
+    customerNumber: string;
     company_name: string;
     company_type: string;
     address: Address;
@@ -217,6 +217,7 @@ export interface BackendCustomer {
   city: string;
   street: string;
   country: string;
+  customerNumber: string;
 }
 
 export interface TokenTransaction {

@@ -66,7 +66,7 @@ export function InvoiceDetailPage() {
         };
         // Robust initialization of customer object
         const customer = {
-          customer_number: extractedData.customer?.customer_number || "",
+          customerNumber: extractedData.customer?.customerNumber || "",
           company_name: extractedData.customer?.company_name || file.customerName || "",
           company_type: extractedData.customer?.company_type || "",
           email: extractedData.customer?.email || file.customerEmail || file.email || "",

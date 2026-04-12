@@ -37,6 +37,7 @@ interface APICustomer {
   country?: string;
   postalCode?: string;
   street?: string;
+  customerNumber?: string;
 
   company?: {
     name?: string;
@@ -74,8 +75,8 @@ export function CustomersPage() {
         setLoading(false);
         return;
       }
-
       const data = await res.json();
+    
       setCustomers(data);
     } catch (error) {
       console.error("Error loading customers:", error);
@@ -280,7 +281,7 @@ export function CustomersPage() {
                     className="px-6 py-4 text-[10px] font-bold text-zinc-400 uppercase tracking-widest cursor-pointer group hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors"
                   >
                     <div className="flex items-center">
-                      Kunde
+                      Number Kunde
                       <SortIcon columnKey="firstName" />
                     </div>
                   </th>
@@ -311,7 +312,7 @@ export function CustomersPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600 font-bold">
-                          {customer.firstName.charAt(0)}
+                          {customer.customerNumber}
                         </div>
                         <div>
                           <p className="font-bold text-zinc-900 dark:text-white">{customer.firstName} {customer.lastName}</p>

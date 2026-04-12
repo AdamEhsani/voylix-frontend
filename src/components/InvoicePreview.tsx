@@ -108,7 +108,7 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                 <span className="text-zinc-400 font-medium">Datum:</span>
                 <span className="font-bold">{data.invoice_meta?.invoice_date}</span>
                 <span className="text-zinc-400 font-medium">Kundennummer:</span>
-                <span className="font-bold">{data.customer?.customer_number}</span>
+                <span className="font-bold">{"C-" + data.customer?.customerNumber}</span>
               </div>
             </div>
           </div>

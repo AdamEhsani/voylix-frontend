@@ -16,7 +16,7 @@ export function CreateFlightInvoicePage() {
       language: "de"
     },
     customer: {
-      customer_number: "",
+      customerNumber: "",
       company_name: "",
       company_type: "",
       email: "",

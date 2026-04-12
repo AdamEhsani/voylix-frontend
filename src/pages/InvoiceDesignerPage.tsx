@@ -68,9 +68,11 @@ const MOCK_INVOICE: TravelInvoice = {
     language: 'de'
   },
   customer: {
-    customer_number: 'C-1001',
+    customerNumber: 'C-1001',
     company_name: 'Max Mustermann',
     company_type: 'Privat',
+    email: '',
+    phone: '',
     address: {
       street: 'Musterstraße 123',
       postalCode: '12345',
