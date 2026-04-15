@@ -10,6 +10,7 @@ export function CreateFlightInvoicePage() {
     invoice_meta: {
       invoice_type: "Flug",
       invoice_number: `RE-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      invoice_id: `R-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       invoice_date: new Date().toLocaleDateString('de-DE'),
       booking_reference: "",
       va_reference: "",

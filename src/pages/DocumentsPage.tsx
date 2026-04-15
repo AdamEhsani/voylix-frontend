@@ -123,7 +123,7 @@ export function DocumentsPage() {
                     </div>
                     <div className="bg-zinc-900 rounded-xl p-4 font-mono text-xs text-emerald-400 overflow-x-auto max-h-[400px]">
                       <pre>{JSON.stringify({
-                        invoice_meta: { invoice_number: "RE-2026-001", date: "06.02.2026" },
+                        invoice_meta: { invoice_id: "R-2026-001", date: "06.02.2026" },
                         agency: { name: "LETS GO TRAVEL" },
                         passengers: [{ name: "Johannes Clasen" }],
                         pricing: { total: 1050.42 }

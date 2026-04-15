@@ -104,7 +104,7 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
             <div className={cn("text-right space-y-1", customerBlockPosition === 'right' && "order-1 text-left")}>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                 <span className="text-zinc-400 font-medium">Rechnungsnummer:</span>
-                <span className="font-bold">{data.invoice_meta?.invoice_number}</span>
+                <span className="font-bold">{'R-' + data.id}</span>
                 <span className="text-zinc-400 font-medium">Datum:</span>
                 <span className="font-bold">{data.invoice_meta?.invoice_date}</span>
                 <span className="text-zinc-400 font-medium">Kundennummer:</span>

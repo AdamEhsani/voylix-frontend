@@ -89,6 +89,7 @@ export interface FlightDetails {
 export interface InvoiceMeta {
   invoice_type: string;
   invoice_number: string;
+  invoice_id: string;
   invoice_date: string;
   booking_reference: string;
   va_reference: string;

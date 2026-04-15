@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Filter, 
-  FileText, 
-  Download, 
-  Eye, 
+import {
+  Search,
+  Filter,
+  FileText,
+  Download,
+  Eye,
   MoreVertical,
   Calendar,
   ChevronLeft,
@@ -27,6 +27,10 @@ interface Invoice {
   amount: number;
   status: string;
   type: string;
+  destination: string;
+  departur_time: string | null;
+  user: string | null;
+  passengers: []
 }
 
 export function InvoicesPage() {
@@ -67,7 +71,7 @@ export function InvoicesPage() {
 
         return {
           id: file.id,
-          number: json?.invoice_meta?.invoice_number ?? `INV-${file.id}`,
+          number: json?.invoice_meta?.invoice_id ?? `R-${file.id}`,
           customer:
             json?.customer?.customer_name ??
             json?.customer?.company_name ??
@@ -77,7 +81,16 @@ export function InvoicesPage() {
             new Date(file.createdAt).toLocaleDateString("de-DE"),
           amount: json?.payments?.invoice_total ?? 0,
           status: json?.payments?.invoice_status ?? "Offen",
-          type: json?.invoice_meta?.invoice_type ?? "Flug"
+          type: json?.invoice_meta?.invoice_type ?? "Flug",
+          departur_time:
+            json?.booking?.travel_start_date ??
+            null,
+          destination: json?.flight_details?.segmentsTo?.[0]?.to?.airport ?? null,
+          passengers: json?.passengers?.map((p: any) => ({
+            index: p.index,
+            fullName: p.first_name + " " + p.last_name,
+          })) ?? [],
+          user:`${json?.agencyUser?.Name ?? ""} ${json?.agencyUser?.NachName ?? ""}`.trim() || "Unbekannt",
         };
       });
 
@@ -96,11 +109,13 @@ export function InvoicesPage() {
     loadInvoices();
   }, []);
 
-  const filteredInvoices = invoices.filter(inv => 
+  const filteredInvoices = invoices.filter(inv =>
     inv.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
     inv.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
     inv.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.status.toLowerCase().includes(searchTerm.toLowerCase())
+    inv.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    inv.destination?.toLowerCase().includes(searchTerm.toLowerCase() ?? "") ||
+    inv.user?.toLowerCase().includes(searchTerm.toLowerCase() ?? "")
   );
 
   // Pagination logic
@@ -134,7 +149,7 @@ export function InvoicesPage() {
           <p className="text-zinc-500 dark:text-zinc-400">Verwalten und verfolgen Sie alle Ihre Reiseabrechnungen.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link 
+          <Link
             to="/pdf-import"
             className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-sm"
           >
@@ -145,7 +160,7 @@ export function InvoicesPage() {
               <Plus size={20} /> Neue Rechnung
             </button>
             <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 overflow-hidden">
-              <Link 
+              <Link
                 to="/invoices/new/flight"
                 className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-b border-zinc-100 dark:border-zinc-800"
               >
@@ -154,7 +169,7 @@ export function InvoicesPage() {
                 </div>
                 Flug
               </Link>
-              <Link 
+              <Link
                 to="/invoices/new/hotel"
                 className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors border-b border-zinc-100 dark:border-zinc-800"
               >
@@ -163,7 +178,7 @@ export function InvoicesPage() {
                 </div>
                 Hotel
               </Link>
-              <Link 
+              <Link
                 to="/invoices/new/package"
                 className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
               >
@@ -210,13 +225,15 @@ export function InvoicesPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider">
-                <th className="px-6 py-4">Rechnungsnummer</th>
+                <th className="px-2 py-2">Rechnungsnummer</th>
                 <th className="px-6 py-4">Typ</th>
                 <th className="px-6 py-4">Kunde</th>
-                <th className="px-6 py-4">Datum</th>
+                <th className="px-6 py-4">Abreise Datum</th>
+                <th className="px-6 py-4">Reiseziel</th>
                 <th className="px-6 py-4">Betrag</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Aktionen</th>
+                <th className="px-6 py-4 text-right">User</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -235,7 +252,7 @@ export function InvoicesPage() {
                     <div className="flex flex-col items-center gap-3">
                       <AlertCircle className="w-8 h-8 text-red-500" />
                       <p className="text-sm text-red-500 font-medium">{error}</p>
-                      <button 
+                      <button
                         onClick={loadInvoices}
                         className="mt-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg text-xs font-bold hover:bg-zinc-200 transition-colors"
                       >
@@ -261,7 +278,7 @@ export function InvoicesPage() {
                         <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600">
                           <FileText size={16} />
                         </div>
-                        <span className="text-sm font-bold text-zinc-900 dark:text-white">{inv.number}</span>
+                        <span className="text-sm font-bold text-zinc-900 dark:text-white">{"R-" + inv.id}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -274,22 +291,35 @@ export function InvoicesPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-zinc-600 dark:text-zinc-400">{inv.customer}</span>
+                      <div className="relative inline-flex items-center gap-1 group">
+                        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+                          {inv.customer}
+                        </span>
+                        {/* tooltip */}
+                        <div className="absolute bottom-full mb-2 left-0 hidden group-hover:block z-50 w-48 rounded-md bg-zinc-900 text-white shadow-lg p-2 text-xs">
+                          {inv.passengers?.map((p: any, i: number) => (
+                            <div key={i}>{p.fullName.toLowerCase()}</div>
+                          ))}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-zinc-500">{inv.date}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm font-bold text-zinc-900 dark:text-white">{formatCurrency(inv.amount)}</span>
+                      <span className="text-sm text-zinc-500">{inv.destination}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <Link 
+                      <span className="text-sm text-zinc-500">{inv.amount}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <Link
                         to={inv.status === "bezahlt" || inv.status === "storniert" ? "#" : `/payment/${inv.id}`}
                         className={cn(
                           "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer",
                           inv.status.toLowerCase() === 'bezahlt' ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" :
-                          inv.status.toLowerCase() === 'offen' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" :
-                          "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                            inv.status.toLowerCase() === 'offen' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" :
+                              "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
                         )}
                       >
                         {inv.status}
@@ -297,17 +327,17 @@ export function InvoicesPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Link 
+                        <Link
                           to={`/invoices/${inv.id}`}
                           className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
                           title="Ansehen"
                         >
                           <Eye size={18} />
                         </Link>
-                        <button className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors">
-                          <MoreVertical size={18} />
-                        </button>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <span className="text-sm text-zinc-500">{inv.user}</span>
                     </td>
                   </tr>
                 ))
@@ -322,8 +352,8 @@ export function InvoicesPage() {
             Zeige {totalItems === 0 ? 0 : startIndex + 1} bis {endIndex} von {totalItems} Rechnungen
           </p>
           <div className="flex items-center gap-2">
-            <button 
-              className="p-1 text-zinc-400 hover:text-zinc-600 disabled:opacity-30" 
+            <button
+              className="p-1 text-zinc-400 hover:text-zinc-600 disabled:opacity-30"
               disabled={currentPage === 1 || loading}
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             >
@@ -339,17 +369,17 @@ export function InvoicesPage() {
                     pageNum = totalPages - 4 + i;
                   }
                 }
-                
+
                 if (pageNum > totalPages || pageNum < 1) return null;
 
                 return (
-                  <button 
+                  <button
                     key={pageNum}
                     onClick={() => setCurrentPage(pageNum)}
                     className={cn(
                       "w-8 h-8 rounded-lg text-xs font-bold transition-all",
-                      currentPage === pageNum 
-                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20" 
+                      currentPage === pageNum
+                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
                         : "hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
                     )}
                   >
@@ -358,7 +388,7 @@ export function InvoicesPage() {
                 );
               })}
             </div>
-            <button 
+            <button
               className="p-1 text-zinc-400 hover:text-zinc-600 disabled:opacity-30"
               disabled={currentPage === totalPages || totalPages === 0 || loading}
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}

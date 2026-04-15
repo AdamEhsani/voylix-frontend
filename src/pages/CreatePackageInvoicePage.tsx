@@ -10,6 +10,7 @@ export function CreatePackageInvoicePage() {
     invoice_meta: {
       invoice_type: "Package",
       invoice_number: `RE-P-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      invoice_id: `R-P-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       invoice_date: new Date().toLocaleDateString('de-DE'),
       booking_reference: "",
       va_reference: "",

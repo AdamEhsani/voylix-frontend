@@ -49,7 +49,7 @@ const DEFAULT_SETTINGS: InvoiceDesignerSettings = {
     payments: true,
     footer: true
   },
-  titleCustomization: 'REISE-RECHNUNG',
+  titleCustomization: 'RECHNUNG',
   mode: 'spacious',
   alignment: 'left',
   showBorders: false,
@@ -61,6 +61,7 @@ const DEFAULT_SETTINGS: InvoiceDesignerSettings = {
 const MOCK_INVOICE: TravelInvoice = {
   invoice_meta: {
     invoice_type: 'travel_invoice',
+    invoice_id: 'R-2024-001',
     invoice_number: 'RE-2024-001',
     invoice_date: '27.03.2024',
     booking_reference: 'ABC123XYZ',

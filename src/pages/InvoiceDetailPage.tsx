@@ -268,7 +268,7 @@ export function InvoiceDetailPage() {
             }
             await new Promise(resolve => setTimeout(resolve, 300));
             if (sharePreviewRef.current && settings) {
-              const fileName = `Rechnung_${data.invoice_meta?.invoice_number || id}.pdf`;
+              const fileName = `Rechnung_${data.invoice_meta?.invoice_id || id}.pdf`;
               const result = await generateInvoicePdf(sharePreviewRef.current, fileName);
               return { ...result, fileName };
             }

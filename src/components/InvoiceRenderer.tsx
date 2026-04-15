@@ -36,6 +36,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
   const invoiceMeta: InvoiceMeta = data.invoice_meta ?? {
     invoice_type: 'Flug',
     invoice_number: '',
+    invoice_id: '',
     invoice_date: '',
     booking_reference: '',
     va_reference: '',
@@ -553,7 +554,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
               </div>
               <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">
                 {invoiceMeta?.invoice_type === 'Flug'
-                  ? 'Reise-Rechnung'
+                  ? 'Rechnung'
                   : 'Rechnung'}
               </h2>
             </div>
@@ -572,8 +573,8 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] text-zinc-500 uppercase font-bold">Nummer:</span>
                 <input
-                  value={invoiceMeta?.invoice_number ?? ''}
-                  onChange={e => updateInvoiceMeta('invoice_number', e.target.value)}
+                  value={"R-" + (data.id ?? invoiceMeta.invoice_id ?? '')}
+                  onChange={e => updateInvoiceMeta('invoice_id', e.target.value)}
                   className="text-xs font-mono text-right bg-transparent border-b border-transparent hover:border-zinc-200 focus:border-emerald-500 outline-none w-32 transition-colors"
                   placeholder="RE-2024-001"
                 />
