@@ -1104,12 +1104,20 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Zimmertyp</label>
-              <input
+              <select
                 value={hotelDetails.room_type ?? ''}
                 onChange={e => updateHotelDetails('room_type', e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
-                placeholder="Doppelzimmer"
-              />
+                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all font-medium appearance-none cursor-pointer"
+              >
+                <option value="">Wählen...</option>
+                <option value="Doppelzimmer">Doppelzimmer (DZ)</option>
+                <option value="Einzelzimmer">Einzelzimmer (EZ)</option>
+                <option value="Dreibettzimmer">Dreibettzimmer (TZ)</option>
+                <option value="Suite">Suite</option>
+                <option value="Apartment">Apartment</option>
+                <option value="Studio">Studio</option>
+                <option value="Villa">Villa</option>
+              </select>
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Check-In</label>
@@ -1131,7 +1139,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                 placeholder="DD.MM.YYYY"
               />
             </div>
-            
+
           </div>
 
           {/* VERPFLEGUNG TOOLBAR */}
