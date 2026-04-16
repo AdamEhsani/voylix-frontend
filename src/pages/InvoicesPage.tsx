@@ -30,6 +30,7 @@ interface Invoice {
   destination: string;
   departur_time: string | null;
   user: string | null;
+  userType: string | null;
   passengers: []
 }
 
@@ -62,7 +63,6 @@ export function InvoicesPage() {
       }
 
       const data = await res.json();
-
       const mapped = data.map((file: any) => {
         const json =
           typeof file.extractedJson === "string"
@@ -91,9 +91,9 @@ export function InvoicesPage() {
             fullName: p.first_name + " " + p.last_name,
           })) ?? [],
           user:`${json?.agencyUser?.Name ?? ""} ${json?.agencyUser?.NachName ?? ""}`.trim() || "Unbekannt",
+          userType: file.userType || "Unbekannt"
         };
       });
-
       setInvoices(mapped);
     } catch (err: any) {
       console.error("Error loading invoices:", err);
@@ -314,7 +314,7 @@ export function InvoicesPage() {
                     </td>
                     <td className="px-6 py-4">
                       <Link
-                        to={inv.status === "bezahlt" || inv.status === "storniert" ? "#" : `/payment/${inv.id}`}
+                        to={inv.userType === "admin" ? `/payment/${inv.id}` : "#"}
                         className={cn(
                           "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer",
                           inv.status.toLowerCase() === 'bezahlt' ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" :

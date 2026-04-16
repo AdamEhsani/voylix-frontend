@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2, Mail, Lock, AlertCircle, ArrowRight, Eye, EyeOff} from 'lucide-react';
 import { motion } from 'motion/react';
 import { API_URL } from "../config/api";
+import { jwtDecode } from "jwt-decode";
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -39,12 +40,12 @@ export function LoginPage() {
 
       const data = await response.json();
       localStorage.setItem("token", data.token);
-
+      const decoded: any = jwtDecode(data.token);
       login({
         token: data.token,
         user: {
-          email: email
-
+          email: email,
+          type: decoded.Type
         }
       });
 
