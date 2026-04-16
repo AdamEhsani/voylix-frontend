@@ -10,7 +10,8 @@ import {
   X,
   ChevronRight,
   Building2,
-  Layout
+  Layout,
+  Calculator
 } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -21,6 +22,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
   { icon: FileText, label: 'Rechnungen', path: '/invoices' },
   { icon: Users, label: 'Kundenverwaltung', path: '/customers' },
+  { icon: Calculator, label: 'Buchhaltung', path: '/accounting' },
   { icon: Coins, label: 'Token-System', path: '/tokens' },
   // { icon: UploadCloud, label: 'Dokumente', path: '/documents' },
   { icon: Layout, label: 'Invoice Designer', path: '/invoices/designer' },

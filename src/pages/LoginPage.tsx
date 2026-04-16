@@ -136,7 +136,7 @@ export function LoginPage() {
                   Passwort
                 </label>
                 <Link 
-                  to="/forgot-password" 
+                  to="" 
                   className="text-xs font-bold text-emerald-600 hover:text-emerald-700 transition-colors"
                 >
                   Passwort vergessen?
@@ -150,7 +150,7 @@ export function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-12 pr-12 py-3.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all text-zinc-900 dark:text-white"
-                  placeholder="••••••••"
+                  placeholder="password"
                 />
                 <button
                   type="button"

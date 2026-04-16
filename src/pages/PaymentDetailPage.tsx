@@ -71,7 +71,7 @@ export function PaymentDetailPage() {
         }
 
         // ✅ گرفتن payments
-        const extractedPayments = parsed?.payments || null;
+        const extractedPayments = parsed?.payments || {};
 
         setInvoice(data);
         setPayments(extractedPayments);
@@ -89,13 +89,13 @@ export function PaymentDetailPage() {
   }, [id]);
 
   const handleSave = async () => {
-    if (!amount || parseFloat(amount) <= 0) return;
+    const paymentDate = payments?.payment_date;
+    if (!amount || parseFloat(amount) <= 0 || !paymentDate) {
+      return;
+    }
 
     setIsSaving(true);
     try {
-
-      setIsSaving(true);
-
       const token = localStorage.getItem("token");
 
       const res = await fetch(`${API_URL}/api/update/PriceUpdate/${id}`, {
@@ -106,7 +106,8 @@ export function PaymentDetailPage() {
         },
         body: JSON.stringify({
           amount: parseFloat(amount),
-          method: method
+          method: method,
+          date: paymentDate // ✅ ارسال تاریخ به بک‌اند
         })
       });
 
@@ -117,20 +118,34 @@ export function PaymentDetailPage() {
       navigate('/invoices');
 
     } catch (err) {
-
       console.error("Payment error:", err);
-
     } finally {
-
       setIsSaving(false);
-
     }
-    await new Promise(resolve => setTimeout(resolve, 800));
-    setIsSaving(false);
-
-    // Redirect back to invoices list
-    navigate('/invoices');
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-20">
+        <div className="w-8 h-8 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto p-8 text-center space-y-4">
+        <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
+        <p className="text-red-500 font-bold">{error}</p>
+        <button 
+          onClick={() => navigate(-1)}
+          className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg"
+        >
+          Zurück
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -166,7 +181,7 @@ export function PaymentDetailPage() {
             </div>
             <p className="text-xs text-zinc-400 italic">Gesamtbetrag der Rechnung: {formatCurrency(payments?.invoice_total)}</p>
             <p className="text-xs text-zinc-400 italic">Bereits bezahlt: {formatCurrency(payments?.invoice_balance || 0)}</p>
-            <p className="text-xs text-red-400 italic">Verbleibender Betrag: {formatCurrency(payments?.invoice_total - (payments?.invoice_balance || 0))}</p>
+            <p className="text-xs text-red-400 italic">Verbleibender Betrag: {formatCurrency((payments?.invoice_total || 0) - (payments?.invoice_balance || 0))}</p>
           </div>
 
           {/* Date Input */}
@@ -174,7 +189,8 @@ export function PaymentDetailPage() {
             <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Datum</label>
             <input
               type="date"
-              value={payments?.payment_date || ''} // باید YYYY-MM-DD باشه
+              required
+              value={payments?.payment_date || ''} 
               onChange={(e) => {
                 setPayments({
                   ...payments,
@@ -187,7 +203,7 @@ export function PaymentDetailPage() {
 
           {/* Payment Method Selection */}
           <div className="space-y-3">
-            <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Raveshe Pardakht (Zahlungsart)</label>
+            <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Zahlungsart</label>
             <div className="grid grid-cols-2 gap-3">
               {paymentMethods.map((m) => (
                 <button
@@ -231,7 +247,7 @@ export function PaymentDetailPage() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || !amount}
+            disabled={isSaving || !amount || !payments?.payment_date}
             className="flex-[2] px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
           >
             {isSaving ? (

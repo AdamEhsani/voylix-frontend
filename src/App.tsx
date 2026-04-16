@@ -6,6 +6,7 @@ import { LogoProvider } from './contexts/LogoContext';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { Loader2 } from 'lucide-react';
 import { Toaster } from 'sonner';
+import { AccountingPage } from './pages/AccountingPage';
 
 // Lazy load pages
 const LoginPage = lazy(() => import('./pages/LoginPage').then(m => ({ default: m.LoginPage })));
@@ -49,7 +50,7 @@ export default function App() {
                   <Route path="/invoices" element={<InvoicesPage />} />
                   <Route path="/invoices/new/flight" element={<CreateFlightInvoicePage />} />
                   <Route path="/invoices/new/hotel" element={<CreateHotelInvoicePage />} />
-                  <Route path="/invoices/new/package" element={<CreatePackageInvoicePage />} />
+                  <Route path="/invoices/new/package" element={<CreatePackageInvoicePage />} /><Route path="/accounting" element={<AccountingPage />} />
                   <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
                   <Route path="/invoices/designer" element={<InvoiceDesignerPage />} />
                   <Route path="/payment/:id" element={<PaymentDetailPage />} />
