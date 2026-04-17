@@ -19,10 +19,10 @@ import { useAuth } from '../contexts/AuthContext';
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
   { icon: FileText, label: 'Rechnungen', path: '/invoices' },
-  { icon: Users, label: 'Kundenverwaltung', path: '/customers' },
   { icon: Calculator, label: 'Buchhaltung', path: '/accounting' },
-  { icon: Coins, label: 'Token-System', path: '/tokens' },
+  { icon: Users, label: 'Kundenverwaltung', path: '/customers' },
   { icon: Layout, label: 'Invoice Designer', path: '/invoices/designer' },
+  { icon: Coins, label: 'Token-System', path: '/tokens' },
   { icon: Building2, label: 'Agenturprofil', path: '/agency' },
 ];
 

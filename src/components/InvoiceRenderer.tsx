@@ -528,7 +528,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       onUpdate({
         ...data,
         customer: {
-          customerNumber: selected.customerNumber || `C-${selected.id}`,
+          customerNumber: String(selected.customerNumber || `C-${selected.id}`),
           company_name: fullName,
           company_type: '',
           email: selected.email,
@@ -606,6 +606,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
   const handleSave = async () => {
     const token = localStorage.getItem("token");
     const finalData = buildFinalInvoice();
+  
     const isUpdate = !!data.id;
     const url = isUpdate 
       ? `${API_BASE_URL}/api/SaveInvoice/invoice` 
@@ -638,6 +639,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       invoice_meta: { ...data.invoice_meta },
       customer: {
         ...data.customer,
+        customerNumber: String(data.customer?.customerNumber ?? ""),
         address: { ...data.customer?.address },
       },
       passengers: (data.passengers ?? []).map(p => ({
@@ -659,6 +661,9 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
           name: item.name,
           amount: Number(item.amount),
         })),
+      },
+            agencyUser:{
+        ...data.agencyUser
       },
       system_meta: { ...data.system_meta },
       legal_notes: { ...data.legal_notes },
@@ -721,18 +726,6 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                 className="text-xs text-right bg-transparent border-b border-transparent hover:border-zinc-200 focus:border-emerald-500 outline-none w-32 transition-colors"
                 placeholder="DD.MM.YYYY"
               />
-            </div>
-            <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-              <span className="text-[10px] text-zinc-500 uppercase font-bold">IATA Logo:</span>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-zinc-400">{data.show_iata_logo ? 'Ja' : 'Nein'}</span>
-                <input 
-                  type="checkbox"
-                  checked={data.show_iata_logo ?? false}
-                  onChange={(e) => onUpdate({ ...data, show_iata_logo: e.target.checked })}
-                  className="accent-emerald-500"
-                />
-              </div>
             </div>
           </div>
         </div>
@@ -1199,141 +1192,6 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                   <button
                     type="button"
                     onClick={() => removeVerpflegung('hotelDto', idx)}
-                    className="p-1 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* PACKAGE DETAILS */}
-      {(invoiceMeta.invoice_type === 'Package') && (
-        <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 space-y-6">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-            <Globe size={14} /> Pauschalreise Details
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Reisename</label>
-              <input
-                value={packageDetails.package_name ?? ''}
-                onChange={e => updatePackageDetails('package_name', e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
-                placeholder="Sommerurlaub 2024"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Zielort</label>
-              <input
-                value={packageDetails.destination ?? ''}
-                onChange={e => updatePackageDetails('destination', e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
-                placeholder="Antalya, Türkei"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Dauer</label>
-              <input
-                value={packageDetails.duration ?? ''}
-                onChange={e => updatePackageDetails('duration', e.target.value)}
-                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
-                placeholder="14 Tage"
-              />
-            </div>
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Inkludierte Leistungen</label>
-              <button
-                onClick={addPackageService}
-                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 print:hidden"
-              >
-                <Plus size={12} /> Leistung hinzufügen
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {(packageDetails.services ?? []).map((service, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <input
-                    value={service}
-                    onChange={e => updatePackageService(idx, e.target.value)}
-                    className="flex-1 px-3 py-1.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500"
-                    placeholder="z.B. Transfer zum Hotel"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removePackageService(idx)}
-                    className="p-1.5 text-zinc-400 hover:text-red-500 print:hidden"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* VERPFLEGUNG TOOLBAR */}
-          <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mr-2">Verpflegung & Transfer:</span>
-              {[
-                { type: 'none', label: 'Ohne', icon: Ban, color: 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200' },
-                { type: 'breakfast', label: 'Frühstück', icon: Coffee, color: 'bg-amber-50 dark:bg-amber-900/20 text-amber-600 hover:bg-amber-100' },
-                { type: 'half_board', label: 'Halbpension', icon: Utensils, color: 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 hover:bg-orange-100' },
-                { type: 'full_board', label: 'Vollpension', icon: Utensils, color: 'bg-red-50 dark:bg-red-900/20 text-red-600 hover:bg-red-100' },
-                { type: 'all_inclusive', label: 'All Inclusive', icon: GlassWater, color: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 hover:bg-emerald-100' },
-                { type: 'transfer', label: 'Transfer', icon: Truck, color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 hover:bg-blue-100' },
-              ].map((opt) => {
-                const isSelected = (packageDetails.verpflegung ?? []).some(v => v.type === opt.type);
-                return (
-                  <button
-                    key={opt.type}
-                    type="button"
-                    disabled={isSelected}
-                    onClick={() => addVerpflegung('package_details', opt.type)}
-                    className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all print:hidden",
-                      isSelected ? "opacity-40 cursor-not-allowed bg-zinc-100 text-zinc-400" : opt.color
-                    )}
-                  >
-                    <opt.icon size={12} /> {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {(packageDetails.verpflegung ?? []).map((v, idx) => (
-                <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-700 shadow-sm group">
-                  <div className={`p-1.5 rounded-lg ${
-                    v.type === 'breakfast' ? 'bg-amber-100 text-amber-600' :
-                    v.type === 'half_board' ? 'bg-orange-100 text-orange-600' :
-                    v.type === 'full_board' ? 'bg-red-100 text-red-600' :
-                    v.type === 'all_inclusive' ? 'bg-emerald-100 text-emerald-600' :
-                    v.type === 'transfer' ? 'bg-blue-100 text-blue-600' :
-                    'bg-zinc-100 text-zinc-600'
-                  }`}>
-                    {v.type === 'breakfast' && <Coffee size={14} />}
-                    {v.type === 'half_board' && <Utensils size={14} />}
-                    {v.type === 'full_board' && <Utensils size={14} />}
-                    {v.type === 'all_inclusive' && <GlassWater size={14} />}
-                    {v.type === 'transfer' && <Truck size={14} />}
-                  </div>
-                  <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
-                    {v.type === 'breakfast' ? 'Frühstück' :
-                     v.type === 'half_board' ? 'Halbpension' :
-                     v.type === 'full_board' ? 'Vollpension' :
-                     v.type === 'all_inclusive' ? 'All Inclusive' :
-                     'Transfer'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => removeVerpflegung('package_details', idx)}
                     className="p-1 text-zinc-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity print:hidden"
                   >
                     <Trash2 size={14} />

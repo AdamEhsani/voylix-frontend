@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Calculator, 
-  Download, 
-  Calendar, 
-  ChevronLeft, 
+import {
+  Search,
+  Filter,
+  Calculator,
+  Download,
+  Calendar,
+  ChevronLeft,
   ChevronRight,
   Loader2,
   AlertCircle,
@@ -17,7 +17,7 @@ import {
   ArrowUpRight
 } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
-
+import { Link } from 'react-router-dom';
 interface AccountingEntry {
   id: string;
   invoiceNumber: string;
@@ -68,6 +68,17 @@ export function AccountingPage() {
         const payments = json?.payments || {};
         const customer = json?.customer || {};
 
+        const rawMethod = payments?.payment_method ?? "";
+        const normalized = rawMethod.toLowerCase();
+
+        const allowedMethod =
+          normalized.includes("bar") ||
+            normalized.includes("kreditkarte") ||
+            normalized.includes("ice karte") ||
+            normalized.includes("überweisung")
+            ? rawMethod
+            : null;
+
         return {
           id: file.id,
           invoiceNumber: json?.invoice_meta?.invoice_number ?? `INV-${file.id}`,
@@ -75,10 +86,10 @@ export function AccountingPage() {
           totalAmount: parseFloat(payments?.invoice_total) || 0,
           paidAmount: parseFloat(payments?.invoice_paid_amount) || 0,
           balance: parseFloat(payments?.invoice_balance) || 0,
-          method: payments?.payment_method ?? "N/A",
+          method: allowedMethod,
           status: payments?.invoice_status ?? "Offen",
           currency: payments?.currency ?? "EUR",
-          date:payments?.payment_date ? payments.payment_date : new Date(file.createdAt).toLocaleDateString("de-DE")
+          date: payments?.payment_date ? payments.payment_date : new Date(file.createdAt).toLocaleDateString("de-DE")
         };
       });
 
@@ -95,7 +106,7 @@ export function AccountingPage() {
     loadAccountingData();
   }, []);
 
-  const filteredEntries = entries.filter(entry => 
+  const filteredEntries = entries.filter(entry =>
     entry.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     entry.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
     entry.method.toLowerCase().includes(searchTerm.toLowerCase())
@@ -121,10 +132,12 @@ export function AccountingPage() {
   };
 
   const getMethodIcon = (method: string) => {
+    if (!method) return null;
+    
     const m = method.toLowerCase();
     if (m.includes('bar')) return <Banknote size={14} />;
     if (m.includes('karte') || m.includes('credit')) return <CreditCard size={14} />;
-    if (m.includes('überweisung') || m.includes('online')) return <ArrowUpRight size={14} />;
+    if (m.includes('überweisung')) return <ArrowUpRight size={14} />;
     return <Wallet size={14} />;
   };
 
@@ -135,8 +148,8 @@ export function AccountingPage() {
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Buchhaltung</h1>
           <p className="text-zinc-500 dark:text-zinc-400">Übersicht über alle Zahlungen und Außenstände.</p>
         </div>
-        <button 
-          onClick={() => {/* Export logic */}}
+        <button
+          onClick={() => {/* Export logic */ }}
           className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors shadow-sm"
         >
           <Download size={20} /> Exportieren
@@ -161,7 +174,7 @@ export function AccountingPage() {
             </div>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Eingegangen</span>
           </div>
-          <p className="text-2xl font-bold text-zinc-900 dark:text-white">{formatCurrency(totalPaid)}</p>
+          <p className="text-2xl font-bold text-zinc-900 dark:text-white">{formatCurrency(totalOutstanding)}</p>
         </div>
         <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -170,7 +183,7 @@ export function AccountingPage() {
             </div>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Offen</span>
           </div>
-          <p className="text-2xl font-bold text-zinc-900 dark:text-white">{formatCurrency(totalOutstanding)}</p>
+          <p className="text-2xl font-bold text-zinc-900 dark:text-white">{formatCurrency(totalRevenue - totalOutstanding)}</p>
         </div>
       </div>
 
@@ -233,7 +246,7 @@ export function AccountingPage() {
                     <div className="flex flex-col items-center gap-3">
                       <AlertCircle className="w-8 h-8 text-red-500" />
                       <p className="text-sm text-red-500 font-medium">{error}</p>
-                      <button 
+                      <button
                         onClick={loadAccountingData}
                         className="mt-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-lg text-xs font-bold hover:bg-zinc-200 transition-colors"
                       >
@@ -284,12 +297,17 @@ export function AccountingPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={cn(
-                        "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border",
-                        getStatusStyles(entry.status)
-                      )}>
+                      <Link
+                        to={`/payment/${entry.id}`}
+                        className={cn(
+                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer",
+                          entry.status.toLowerCase() === 'bezahlt' ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" :
+                            entry.status.toLowerCase() === 'offen' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" :
+                              "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                        )}
+                      >
                         {entry.status}
-                      </span>
+                      </Link>
                     </td>
                   </tr>
                 ))
@@ -304,8 +322,8 @@ export function AccountingPage() {
             Zeige {totalItems === 0 ? 0 : startIndex + 1} bis {endIndex} von {totalItems} Einträgen
           </p>
           <div className="flex items-center gap-2">
-            <button 
-              className="p-1 text-zinc-400 hover:text-zinc-600 disabled:opacity-30" 
+            <button
+              className="p-1 text-zinc-400 hover:text-zinc-600 disabled:opacity-30"
               disabled={currentPage === 1 || loading}
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             >
@@ -322,13 +340,13 @@ export function AccountingPage() {
                 }
                 if (pageNum > totalPages || pageNum < 1) return null;
                 return (
-                  <button 
+                  <button
                     key={pageNum}
                     onClick={() => setCurrentPage(pageNum)}
                     className={cn(
                       "w-8 h-8 rounded-lg text-xs font-bold transition-all",
-                      currentPage === pageNum 
-                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20" 
+                      currentPage === pageNum
+                        ? "bg-emerald-600 text-white shadow-md shadow-emerald-500/20"
                         : "hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-400"
                     )}
                   >
@@ -337,7 +355,7 @@ export function AccountingPage() {
                 );
               })}
             </div>
-            <button 
+            <button
               className="p-1 text-zinc-400 hover:text-zinc-600 disabled:opacity-30"
               disabled={currentPage === totalPages || totalPages === 0 || loading}
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}

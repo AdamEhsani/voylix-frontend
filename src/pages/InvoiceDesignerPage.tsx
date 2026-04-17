@@ -144,6 +144,13 @@ const MOCK_INVOICE: TravelInvoice = {
       { name: 'Steuern & Gebühren', amount: 250.50 }
     ]
   },
+        agencyUser:{
+      agencyId:"",
+      name:"",
+      nachName:"",
+      id:"",
+      type:""
+    },
   booking: {
     booking_date: '27.03.2024',
     travel_start_date: '15.06.2024',

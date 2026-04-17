@@ -60,6 +60,13 @@ export function CreateHotelInvoicePage() {
       payment_date: "",
       line_items: []
     },
+      agencyUser:{
+      agencyId:"",
+      name:"",
+      nachName:"",
+      id:"",
+      type:""
+    },
     legal_notes: {
       immediate_due_notice: "Der Rechnungsbetrag ist sofort fällig.",
       tax_change_notice: "Preisanpassungen aufgrund von Steueränderungen vorbehalten.",

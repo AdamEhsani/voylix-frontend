@@ -68,6 +68,41 @@ export function InvoicesPage() {
           typeof file.extractedJson === "string"
             ? JSON.parse(file.extractedJson)
             : file.extractedJson || {};
+        // const segments = json?.flight_details?.segmentsTo;
+        // const firstFlight = segments?.length
+        //   ? [...segments].sort(
+        //     (a, b) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime()
+        //   )[0]
+        //   : null;
+
+        const isHotel = json?.invoice_meta?.invoice_type === "Hotel";
+
+        const segments = json?.flight_details?.segmentsTo;
+
+        const firstFlight = segments?.length
+          ? segments.reduce((min, s) =>
+            new Date(s.departure_time) < new Date(min.departure_time) ? s : min
+          )
+          : null;
+
+        const destinationHotel = json?.hotelDto?.location ?? null;
+
+        const dateHotel = json?.hotelDto?.check_in
+          ? new Date(json.hotelDto.check_in).toLocaleDateString("de-DE")
+          : null;
+
+        const destination = isHotel
+          ? destinationHotel
+          : segments?.length
+            ? segments[segments.length - 1]?.to?.airport
+            : null;
+
+        const date = isHotel
+          ? dateHotel
+          : firstFlight
+            ? new Date(firstFlight.departure_time).toLocaleDateString("de-DE")
+            : null;
+
 
         return {
           id: file.id,
@@ -76,21 +111,19 @@ export function InvoicesPage() {
             json?.customer?.customer_name ??
             json?.customer?.company_name ??
             "Unknown",
-          date:
-            json?.invoice_meta?.invoice_date ??
-            new Date(file.createdAt).toLocaleDateString("de-DE"),
+          date: date,
           amount: json?.payments?.invoice_total ?? 0,
           status: json?.payments?.invoice_status ?? "Offen",
           type: json?.invoice_meta?.invoice_type ?? "Flug",
           departur_time:
             json?.booking?.travel_start_date ??
             null,
-          destination: json?.flight_details?.segmentsTo?.[0]?.to?.airport ?? null,
+          destination: destination,
           passengers: json?.passengers?.map((p: any) => ({
             index: p.index,
             fullName: p.first_name + " " + p.last_name,
           })) ?? [],
-          user:`${json?.agencyUser?.Name ?? ""} ${json?.agencyUser?.NachName ?? ""}`.trim() || "Unbekannt",
+          user: `${json?.agencyUser?.Name ?? ""} ${json?.agencyUser?.NachName ?? ""}`.trim() || "Unbekannt",
           userType: file.userType || "Unbekannt"
         };
       });
@@ -137,7 +170,7 @@ export function InvoicesPage() {
     const normalizedType = type.toLowerCase();
     if (normalizedType.includes('flug')) return "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400";
     if (normalizedType.includes('hotel')) return "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400";
-    if (normalizedType.includes('pauschal')) return "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400";
+    if (normalizedType.includes('package')) return "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400";
     return "bg-zinc-50 dark:bg-zinc-900/20 text-zinc-600 dark:text-zinc-400";
   };
 
@@ -310,7 +343,12 @@ export function InvoicesPage() {
                       <span className="text-sm text-zinc-500">{inv.destination}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-zinc-500">{inv.amount}</span>
+                      <span className="text-sm text-zinc-500">
+                        {new Intl.NumberFormat("de-DE", {
+                          style: "currency",
+                          currency: "EUR",
+                        }).format(inv.amount)}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <Link

@@ -16,6 +16,13 @@ export function CreateFlightInvoicePage() {
       va_reference: "",
       language: "de"
     },
+    agencyUser:{
+      agencyId:"",
+      name:"",
+      nachName:"",
+      id:"",
+      type:""
+    },
     customer: {
       customerNumber: "",
       company_name: "",

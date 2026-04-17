@@ -173,6 +173,13 @@ export interface TravelInvoice {
     entries?: PaymentEntry[]; // Keep for UI compatibility
     line_items?: { name: string; amount: number }[];
   };
+    agencyUser:{
+    id:string;
+    agencyId:string;
+    name:string;
+    nachName:string;
+    type:string;
+  };
   baggage?: {
     departure: {
       passenger_name: string;
