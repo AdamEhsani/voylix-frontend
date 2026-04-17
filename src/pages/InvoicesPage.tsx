@@ -14,7 +14,8 @@ import {
   Landmark,
   Briefcase,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatCurrency, cn } from '../utils';
@@ -41,7 +42,9 @@ export function InvoicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  
   const loadInvoices = async () => {
     try {
       setLoading(true);
@@ -68,13 +71,7 @@ export function InvoicesPage() {
           typeof file.extractedJson === "string"
             ? JSON.parse(file.extractedJson)
             : file.extractedJson || {};
-        // const segments = json?.flight_details?.segmentsTo;
-        // const firstFlight = segments?.length
-        //   ? [...segments].sort(
-        //     (a, b) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime()
-        //   )[0]
-        //   : null;
-
+            
         const isHotel = json?.invoice_meta?.invoice_type === "Hotel";
 
         const segments = json?.flight_details?.segmentsTo;
@@ -142,14 +139,52 @@ export function InvoicesPage() {
     loadInvoices();
   }, []);
 
-  const filteredInvoices = invoices.filter(inv =>
-    inv.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    inv.destination?.toLowerCase().includes(searchTerm.toLowerCase() ?? "") ||
-    inv.user?.toLowerCase().includes(searchTerm.toLowerCase() ?? "")
-  );
+  const filteredInvoices = invoices.filter(inv => {
+    const matchesSearch = 
+      inv.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inv.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inv.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inv.status.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (!matchesSearch) return false;
+
+    if (startDate || endDate) {
+      // Parse the DD.MM.YYYY date for comparison
+      const parts = inv.date.split('.');
+      if (parts.length === 3) {
+        const invDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          if (invDate < start) return false;
+        }
+        
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (invDate > end) return false;
+        }
+      } else {
+        // Fallback for YYYY-MM-DD
+        const invDate = new Date(inv.date);
+        if (!isNaN(invDate.getTime())) {
+          if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            if (invDate < start) return false;
+          }
+          if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            if (invDate > end) return false;
+          }
+        }
+      }
+    }
+
+    return true;
+  });
 
   // Pagination logic
   const totalItems = filteredInvoices.length;
@@ -226,29 +261,62 @@ export function InvoicesPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
-          <input
-            type="text"
-            placeholder="Rechnungsnummer oder Kunde suchen..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
-          />
-        </div>
-        <div className="flex gap-2">
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-            <select className="pl-9 pr-4 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none appearance-none min-w-[140px]">
-              <option>Alle Zeiträume</option>
-              <option>Dieser Monat</option>
-              <option>Letzter Monat</option>
-            </select>
+      <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <div className="flex flex-col lg:flex-row items-end gap-4">
+          <div className="flex-1 w-full space-y-1.5">
+            <label className="text-[10px] font-bold text-zinc-400 uppercase ml-1">Suche</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
+              <input
+                type="text"
+                placeholder="Nummer oder Kunde suchen..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all text-sm"
+              />
+            </div>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">
-            <Filter size={16} /> Filter
-          </button>
+          
+          <div className="flex flex-wrap sm:flex-nowrap items-end gap-3 w-full lg:w-auto">
+            <div className="space-y-1.5 flex-1 sm:flex-none sm:w-44">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase ml-1">Von</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                <input 
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-1.5 flex-1 sm:flex-none sm:w-44">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase ml-1">Bis</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                <input 
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
+                />
+              </div>
+            </div>
+
+            {(startDate || endDate || searchTerm) && (
+              <button 
+                onClick={() => {
+                  setSearchTerm('');
+                  setStartDate('');
+                  setEndDate('');
+                }}
+                className="h-[38px] px-4 flex items-center justify-center gap-2 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors border border-transparent hover:border-red-200"
+              >
+                <X size={14} /> Reset
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

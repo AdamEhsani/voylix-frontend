@@ -14,7 +14,8 @@ import {
   Wallet,
   CreditCard,
   Banknote,
-  ArrowUpRight
+  ArrowUpRight,
+  X
 } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
 import { Link } from 'react-router-dom';
@@ -38,6 +39,8 @@ export function AccountingPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   const loadAccountingData = async () => {
     try {
@@ -77,7 +80,7 @@ export function AccountingPage() {
             normalized.includes("ice karte") ||
             normalized.includes("überweisung")
             ? rawMethod
-            : null;
+            : "-";
 
         return {
           id: file.id,
@@ -106,11 +109,53 @@ export function AccountingPage() {
     loadAccountingData();
   }, []);
 
-  const filteredEntries = entries.filter(entry =>
-    entry.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    entry.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    entry.method.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEntries = entries.filter(entry => {
+    const matchesSearch = 
+      entry.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      entry.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      entry.method.toLowerCase().includes(searchTerm.toLowerCase());
+
+    if (!matchesSearch) return false;
+
+    if (startDate || endDate) {
+      // Parse the DD.MM.YYYY date for comparison
+      const parts = entry.date.split('.');
+      if (parts.length === 3) {
+        const invDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        invDate.setHours(0, 0, 0, 0);
+        
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          if (invDate < start) return false;
+        }
+        
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (invDate > end) return false;
+        }
+      } else {
+        // Fallback for YYYY-MM-DD
+        const invDate = new Date(entry.date);
+        if (!isNaN(invDate.getTime())) {
+          invDate.setHours(0, 0, 0, 0);
+          if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            if (invDate < start) return false;
+          }
+          if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            if (invDate > end) return false;
+          }
+        }
+      }
+    }
+
+    return true;
+  });
 
   // Stats
   const totalRevenue = filteredEntries.reduce((acc, curr) => acc + curr.totalAmount, 0);
@@ -199,19 +244,46 @@ export function AccountingPage() {
             className="w-full pl-10 pr-4 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
           />
         </div>
-        <div className="flex gap-2">
-          <div className="relative">
-            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
-            <select className="pl-9 pr-4 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none appearance-none min-w-[140px]">
-              <option>Alle Zeiträume</option>
-              <option>Dieser Monat</option>
-              <option>Letzter Monat</option>
-            </select>
+          <div className="flex flex-wrap sm:flex-nowrap items-end gap-3 w-full lg:w-auto">
+            <div className="space-y-1.5 flex-1 sm:flex-none sm:w-44">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase ml-1">Von</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                <input 
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-1.5 flex-1 sm:flex-none sm:w-44">
+              <label className="text-[10px] font-bold text-zinc-400 uppercase ml-1">Bis</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                <input 
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-medium"
+                />
+              </div>
+            </div>
+
+            {(startDate || endDate || searchTerm) && (
+              <button 
+                onClick={() => {
+                  setSearchTerm('');
+                  setStartDate('');
+                  setEndDate('');
+                }}
+                className="h-[38px] px-4 flex items-center justify-center gap-2 text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors border border-transparent hover:border-red-200"
+              >
+                <X size={14} /> Reset
+              </button>
+            )}
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors">
-            <Filter size={16} /> Filter
-          </button>
-        </div>
       </div>
 
       {/* Accounting Table */}

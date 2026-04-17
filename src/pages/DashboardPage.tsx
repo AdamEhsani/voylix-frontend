@@ -9,7 +9,8 @@ import {
   ArrowUpDown,
   Filter,
   ChevronRight,
-  CreditCard,
+  X,
+  Calendar,
   TrendingUp,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -53,6 +54,9 @@ export function DashboardPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -131,11 +135,27 @@ export function DashboardPage() {
   const filteredAndSortedInvoices = useMemo(() => {
     let result = [...dashboard.unpaidInvoices];
 
-    // Filter by Month and Year
-    result = result.filter((inv) => {
-      const date = new Date(inv.createdAt);
-      return date.getMonth() === selectedMonth && date.getFullYear() === selectedYear;
-    });
+    // Filter by Date Range
+    if (startDate || endDate) {
+      result = result.filter((inv) => {
+        const invDate = new Date(inv.createdAt);
+        invDate.setHours(0, 0, 0, 0);
+
+        if (startDate) {
+          const start = new Date(startDate);
+          start.setHours(0, 0, 0, 0);
+          if (invDate < start) return false;
+        }
+
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (invDate > end) return false;
+        }
+
+        return true;
+      });
+    }
 
     // Search
     if (searchTerm) {
@@ -161,7 +181,7 @@ export function DashboardPage() {
     });
 
     return result;
-  }, [dashboard.unpaidInvoices, searchTerm, sortBy, sortOrder, selectedMonth, selectedYear]);
+  }, [dashboard.unpaidInvoices, searchTerm, sortBy, sortOrder, startDate, endDate]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
@@ -241,7 +261,7 @@ export function DashboardPage() {
 
               <div className="flex flex-wrap items-center gap-3">
                 {/* Search */}
-                <div className="relative">
+                <div className="relative mt-6">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
                   <input
                     type="text"
@@ -253,25 +273,31 @@ export function DashboardPage() {
                 </div>
 
                 {/* Month Filter */}
-                <div className="flex items-center gap-2">
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                    className="px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  >
-                    {months.map((m, i) => (
-                      <option key={i} value={i}>{m}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                    className="px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20"
-                  >
-                    {years.map((y) => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
+              <div className="space-y-1.5 w-full sm:w-40">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase ml-1">Von</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-medium"
+                    />
+                  </div>
+                </div>
+
+                {/* To Date */}
+                <div className="space-y-1.5 w-full sm:w-40">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase ml-1">Bis</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={16} />
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-medium"
+                    />
+                  </div>
                 </div>
 
                 {/* Sort */}
@@ -281,7 +307,7 @@ export function DashboardPage() {
                     else setSortBy('date');
                   }}
                   className={cn(
-                    "p-2 rounded-xl border transition-all flex items-center gap-2 text-sm font-medium",
+                    "p-2 rounded-xl border transition-all flex items-center gap-2 text-sm font-medium mt-6",
                     sortBy === 'date' ? "bg-emerald-50 border-emerald-200 text-emerald-600" : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-600"
                   )}
                 >
