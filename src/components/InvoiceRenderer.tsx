@@ -674,13 +674,13 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
     <>
       {/* HIDDEN PRINT PREVIEW */}
       {isPrinting && printSettings && (
-        <div className="hidden print:block fixed inset-0 bg-white z-[9999]">
+        <div className="hidden print:block absolute top-0 left-0 w-full bg-white z-[9999] overflow-visible">
           <InvoicePreview data={data} settings={printSettings} agencyLogoPath={agencyLogoPath} />
         </div>
       )}
 
       <div className={cn(
-        "bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden print:shadow-none print:border-none print:bg-white print:text-black",
+        "bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden print:overflow-visible print:shadow-none print:border-none print:bg-white print:text-black",
         isPrinting && "print:hidden"
       )}>
 

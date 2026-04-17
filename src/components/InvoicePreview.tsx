@@ -376,7 +376,7 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
   return (
     <div
       className={cn(
-        "w-full h-full flex flex-col bg-white text-zinc-900",
+        "w-full min-h-full flex flex-col bg-white text-zinc-900 print:h-auto print:min-h-0",
         alignment === 'center' && "text-center"
       )}
       style={{
