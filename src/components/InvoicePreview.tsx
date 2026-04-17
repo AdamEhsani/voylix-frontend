@@ -2,7 +2,7 @@ import { API_URL } from "../config/api";
 import React from 'react';
 import { Printer } from 'lucide-react';
 import { InvoiceDesignerSettings, TravelInvoice } from '../types';
-import { cn} from '../utils';
+import { cn } from '../utils';
 import LogoAgency from './LogoAgency';
 
 interface InvoicePreviewProps {
@@ -143,77 +143,44 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
           (data.flight_details?.segmentsBack?.length ?? 0) > 0;
 
         if (!shouldShowFlight || !hasFlightData) return null;
+
         return (
           <div key="flight" className={cn(spacingClass, dividerClass)}>
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4 text-center">Flugdetails</h3>
-            
-            {data.flight_details.segmentsTo && data.flight_details.segmentsTo.length > 0 && (
-              <>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">Hinflug</h3>
-                <div className="space-y-4 mb-6">
-                  {data.flight_details.segmentsTo.map((s, i) => (
-                    <div key={i} className={cn("grid grid-cols-4 gap-4 items-center", borderClass)}>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded">
-                          <Printer size={16} />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-zinc-400 uppercase">Flug</p>
-                          <p className="font-bold">{s.flight_number}</p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Airline</p>
-                        <p className="font-bold">{s.airline || data.flight_details.airline}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Strecke</p>
-                        <p className="font-bold">{s.from?.airport} → {s.to?.airport}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Zeit</p>
-                        <p className="font-bold">{s.departure_time}</p>
-                        <p className="font-bold">{s.arrival_time}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-
-            {data.flight_details.segmentsBack && data.flight_details.segmentsBack.length > 0 && (
-              <>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">Rückflug</h3>
-                <div className="space-y-4">
-                  {data.flight_details.segmentsBack.map((s, i) => (
-                    <div key={i} className={cn("grid grid-cols-4 gap-4 items-center", borderClass)}>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded">
-                          <Printer size={16} />
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-zinc-400 uppercase">Flug</p>
-                          <p className="font-bold">{s.flight_number}</p>
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Airline</p>
-                        <p className="font-bold">{s.airline || data.flight_details.airline}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Strecke</p>
-                        <p className="font-bold">{s.from?.airport} → {s.to?.airport}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-bold text-zinc-400 uppercase">Zeit</p>
-                        <p className="font-bold">{s.departure_time}</p>
-                        <p className="font-bold">{s.arrival_time}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+            <div className="space-y-1">
+              {[
+                { label: 'Hinflug', segments: data.flight_details.segmentsTo },
+                { label: 'Rückflug', segments: data.flight_details.segmentsBack }
+              ].map(({ label, segments }, groupIdx) => (
+                segments && segments.length > 0 && (
+                  <div key={groupIdx} className="overflow-hidden border border-zinc-100 rounded-lg">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-zinc-50 border-b border-zinc-100">
+                          <th className="px-3 py-1.5 text-[9px] font-bold text-zinc-400 uppercase w-16">{label}</th>
+                          <th className="px-3 py-1.5 text-[9px] font-bold text-zinc-500 uppercase">Airline</th>
+                          <th className="px-3 py-1.5 text-[9px] font-bold text-zinc-500 uppercase">Strecke</th>
+                          <th className="px-3 py-1.5 text-[9px] font-bold text-zinc-500 uppercase text-right">Abflug / Ankunft</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-50">
+                        {segments.map((s, i) => (
+                          <tr key={i} className="text-[10px]">
+                            <td className="px-3 py-1.5 text-zinc-700 font-bold">{s.flight_number}</td>
+                            <td className="px-3 py-1.5 text-zinc-700">{s.airline || data.flight_details.airline}</td>
+                            <td className="px-3 py-1.5 text-zinc-700">{s.from?.airport} → {s.to?.airport}</td>
+                            <td className="px-3 py-1.5 text-right text-zinc-700 whitespace-nowrap">
+                              <span className="font-bold">{s.departure_time}</span>
+                              <span className="mx-1 text-zinc-300">/</span>
+                              <span>{s.arrival_time}</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ))}
+            </div>
           </div>
         );
       }
@@ -223,67 +190,48 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
         const shouldShowHotel =
           type === 'Hotel' ||
           type === 'Package';
-
+        
         if (!shouldShowHotel || !data.hotelDto) return null;
         return (
           <div key="hotel" className={cn(spacingClass, dividerClass)}>
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-4">
-              Hoteldetails
-            </h3>
+            <div className={cn("p-3", borderClass)}>
+              <div className="grid grid-cols-5 gap-4 items-center">
 
-            <div className={cn("space-y-6", borderClass)}>
-              {/* SATR 1 */}
-              <div className="grid grid-cols-3 gap-6 items-start">
                 <div>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase mb-1">Hotel</p>
-                  <p className="text-zinc-700 font-bold">{data.hotelDto.name}</p>
+                  <p className="text-[8px] font-bold text-zinc-400 uppercase">Hotel / Standort</p>
+                  <p className="text-zinc-700 font-bold text-[10px]">{data.hotelDto.name}</p>
+                  <p className="text-zinc-500 text-[9px]">{data.hotelDto.location}</p>
                 </div>
 
                 <div>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase mb-1">Standort</p>
-                  <p className="text-zinc-700">{data.hotelDto.location}</p>
+                  <p className="text-[8px] font-bold text-zinc-400 uppercase">Check-In</p>
+                  <p className="font-bold text-[10px]">{data.hotelDto.check_in}</p>
                 </div>
 
                 <div>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase mb-2">Leistungen</p>
-                  <div className="flex flex-wrap gap-2">
-                    {data.hotelDto.verpflegung?.map((v, i) => (
-                      <div
-                        key={i}
-                        className="text-zinc-700"
-                      >
-                        {v.type === 'breakfast' && <span className="text-zinc-600">Frühstück</span>}
-                        {v.type === 'half_board' && <span className="text-zinc-600">Halbpension</span>}
-                        {v.type === 'full_board' && <span className="text-zinc-600">Vollpension</span>}
-                        {v.type === 'all_inclusive' && <span className="text-zinc-600">All Inclusive</span>}
-                        {v.type === 'transfer' && <span className="text-zinc-600">Transfer</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* SATR 2 */}
-              <div className="grid grid-cols-4 gap-6">
-                <div>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase">Check-In</p>
-                  <p className="font-bold">{data.hotelDto.check_in}</p>
+                  <p className="text-[8px] font-bold text-zinc-400 uppercase">Check-Out</p>
+                  <p className="font-bold text-[10px]">{data.hotelDto.check_out}</p>
                 </div>
 
                 <div>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase">Check-Out</p>
-                  <p className="font-bold">{data.hotelDto.check_out}</p>
+                  <p className="text-[8px] font-bold text-zinc-400 uppercase">Zimmer</p>
+                  <p className="text-[10px]">{data.hotelDto.room_type}</p>
                 </div>
 
                 <div>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase">Zimmer</p>
-                  <p className="font-bold">{data.hotelDto.room_type}</p>
+                  <p className="text-[8px] font-bold text-zinc-400 uppercase">Inklusive</p>
+                  <p className="text-[9px] text-zinc-500">
+                    {data.hotelDto.verpflegung?.map(v => {
+                      if (v.type === 'breakfast') return 'Frühstück';
+                      if (v.type === 'half_board') return 'HP';
+                      if (v.type === 'full_board') return 'VP';
+                      if (v.type === 'all_inclusive') return 'All Inclusive';
+                      if (v.type === 'transfer') return 'Transfer';
+                      return '';
+                    }).join(', ')}
+                  </p>
                 </div>
 
-                <div>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase">Verpflegung</p>
-                  <p className="font-bold">{data.hotelDto.board_type}</p>
-                </div>
               </div>
             </div>
           </div>
