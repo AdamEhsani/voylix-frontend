@@ -16,7 +16,10 @@ import {
   EyeOff
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { cn } from '../utils';
 import { toast } from 'sonner';
+
+// Using API_BASE_URL from utils as API_URL to match user's logic
 
 export function AgencyProfilePage() {
   const { user } = useAuth();
@@ -72,24 +75,34 @@ export function AgencyProfilePage() {
 
         const data = await response.json();
         
+        const agency = data.agency || {};
+        const userEmail = typeof data.emailUser === 'object' && data.emailUser !== null && 'emailUser' in data.emailUser 
+          ? (data.emailUser as any).emailUser 
+          : (data.emailUser || '');
+
         setForm({
-          name: data.name || '',
-          legalName: data.legalName || '',
-          email: data.email || '',
-          phone: data.phone || '',
-          website: data.website || '',
-          address: data.address || '',
-          postalCode: data.postalCode || '',
-          city: data.city || '',
-          taxInfo: data.taxInfo || '',
-          vatId: data.vatId || '',
-          iban: data.iban || '',
-          bic: data.bic || '',
-          bankName: data.bankName || '',
+          name: agency.name || '',
+          legalName: agency.legalName || '',
+          email: agency.email || '',
+          phone: agency.phone || '',
+          website: agency.website || '',
+          address: agency.address || '',
+          postalCode: agency.postalCode || '',
+          city: agency.city || '',
+          taxInfo: agency.taxInfo || '',
+          vatId: agency.vatId || '',
+          iban: agency.iban || '',
+          bic: agency.bic || '',
+          bankName: agency.bankName || '',
         });
 
-        if (data.logoPath) {
-          const cleanPath = normalizePath(data.logoPath);
+        setPasswordForm(prev => ({
+          ...prev,
+          email: userEmail
+        }));
+
+        if (agency.logoPath) {
+          const cleanPath = normalizePath(agency.logoPath);
           setLogoPreview(`${API_URL}${cleanPath}`);
         }
       } catch (err) {
@@ -134,7 +147,7 @@ export function AgencyProfilePage() {
       formData.append("Phone", form.phone);
       formData.append("Website", form.website);
       formData.append("Address", form.address);
-      formData.append("PostalCode", form.postalCode);
+      formData.append("postalCode", form.postalCode);
       formData.append("City", form.city);
       formData.append("TaxInfo", form.taxInfo);
       formData.append("VatId", form.vatId);
@@ -176,6 +189,10 @@ export function AgencyProfilePage() {
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!passwordForm.oldPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast.error("Bitte füllen Sie alle Passwortfelder aus.");
+      return;
+    }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       toast.error("Passwörter stimmen nicht überein.");
       return;
@@ -467,17 +484,21 @@ export function AgencyProfilePage() {
               <Lock size={20} className="text-zinc-400" /> Passwort ändern
             </h3>
             <form onSubmit={handlePasswordChange} className="space-y-6" autoComplete="off">
+              {/* Honeypot to trick browser autofill */}
+              <div style={{ display: 'none' }}>
+                <input type="text" name="fake-user-name" />
+                <input type="password" name="fake-password" />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-500">E-Mail</label>
+                  <label className="text-sm font-medium text-zinc-500">Email Adresse</label>
                   <input 
                     type="email" 
-                    name="password-change-email"
-                    autoComplete="off"
+                    name="emailUser"
                     value={passwordForm.email}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, email: e.target.value }))}
-                    required
-                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all" 
+                    disabled
+                    className="w-full px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl outline-none text-zinc-500 cursor-not-allowed" 
                   />
                 </div>
                 <div className="space-y-2">
@@ -485,8 +506,8 @@ export function AgencyProfilePage() {
                   <div className="relative">
                     <input 
                       type={showPasswords.old ? "text" : "password"}
-                      name="current-password"
-                      autoComplete="current-password"
+                      name="old-pass-field"
+                      autoComplete="new-password"
                       value={passwordForm.oldPassword}
                       onChange={(e) => setPasswordForm(prev => ({ ...prev, oldPassword: e.target.value }))}
                       required
@@ -506,7 +527,7 @@ export function AgencyProfilePage() {
                   <div className="relative">
                     <input 
                       type={showPasswords.new ? "text" : "password"}
-                      name="new-password"
+                      name="new-pass-field"
                       autoComplete="new-password"
                       value={passwordForm.newPassword}
                       onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
@@ -527,7 +548,7 @@ export function AgencyProfilePage() {
                   <div className="relative">
                     <input 
                       type={showPasswords.confirm ? "text" : "password"}
-                      name="confirm-password"
+                      name="confirm-pass-field"
                       autoComplete="new-password"
                       value={passwordForm.confirmPassword}
                       onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
