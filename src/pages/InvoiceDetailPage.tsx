@@ -16,7 +16,7 @@ export function InvoiceDetailPage() {
   const [data, setData] = useState<TravelInvoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState('Überweisung');
+  const [method, setMethod] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toLocaleDateString('de-DE'));
   const [isSaving, setIsSaving] = useState(false);
   const [isStornieren, setIsStornieren] = useState(false);
@@ -249,8 +249,12 @@ export function InvoiceDetailPage() {
             const token = localStorage.getItem("token");
             let settings = printSettings;
             if (!settings) {
-              const settingsRes = await fetch(`${API_URL}/api/PrintSetting`, {
-                headers: { Authorization: `Bearer ${token}` }
+              const settingsRes = await fetch(`${API_URL}/api/PrintSetting/loadSetting`, {
+                        method: 'GET',
+                        headers: {
+                          'Authorization': `Bearer ${token}`,
+                          'Content-Type': 'application/json'
+                        }
               });
               if (settingsRes.ok) {
                 settings = await settingsRes.json();

@@ -12,6 +12,30 @@ export async function generateInvoicePdf(element: HTMLElement, fileName: string)
       useCORS: true,
       logging: false,
       backgroundColor: '#ffffff',
+      onclone: (clonedDoc) => {
+        const style = clonedDoc.createElement('style');
+        style.innerHTML = `
+    * {
+      color: revert !important;
+      background-color: revert !important;
+      border-color: revert !important;
+    }
+    body, * {
+      --tw-prose-body: #374151;
+    }
+  `;
+        clonedDoc.head.appendChild(style);
+
+        const elements = clonedDoc.getElementsByTagName('*');
+        for (let i = 0; i < elements.length; i++) {
+          const el = elements[i] as HTMLElement;
+          const computed = window.getComputedStyle(el);
+          const bg = computed.backgroundColor;
+          const color = computed.color;
+          if (bg.includes('oklch')) el.style.backgroundColor = '#ffffff';
+          if (color.includes('oklch')) el.style.color = '#000000';
+        }
+      }
     });
 
     const imgData = canvas.toDataURL('image/jpeg', 0.95);
@@ -26,9 +50,9 @@ export async function generateInvoicePdf(element: HTMLElement, fileName: string)
     const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
 
     pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-    
+
     const blob = pdf.output('blob');
-    
+
     // Convert to base64 for easy API transmission
     const base64 = pdf.output('datauristring').split(',')[1];
 

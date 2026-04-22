@@ -49,9 +49,9 @@ export function Sidebar() {
 
           <div className="p-6 flex items-center gap-3">
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold">
-              R
+              V
             </div>
-            {isOpen && <span className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">Rechino</span>}
+            {isOpen && <span className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">Voylix</span>}
           </div>
 
           <nav className="flex-1 px-3 space-y-1">

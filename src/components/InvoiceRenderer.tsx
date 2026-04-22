@@ -99,7 +99,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
   }
 
   const payments = data.payments ?? {
-    payment_method: 'Banküberweisung',
+    payment_method: '',
     invoice_status: 'offen',
     invoice_total: 0,
     invoice_paid_amount: 0,
@@ -463,7 +463,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
     const total = items.reduce((sum, item) => sum + Number(item.amount), 0);
     const paid = Number(payments.invoice_paid_amount || 0)
-    const balance = total - paid
+    const balance = 0
 
     onUpdate({
       ...data,
@@ -487,7 +487,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
     const total = items.reduce((sum, item) => sum + Number(item.amount), 0);
     const paid = Number(payments.invoice_paid_amount || 0)
-    const balance = total - paid
+    const balance = 0
 
     onUpdate({
       ...data,
@@ -509,7 +509,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
     const total = items.reduce((sum, item) => sum + Number(item.amount), 0);
     const paid = Number(payments.invoice_paid_amount || 0)
-    const balance = total - paid
+    const balance = 0
 
     onUpdate({
       ...data,
@@ -605,8 +605,9 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
   const handleSave = async () => {
     const token = localStorage.getItem("token");
+
     const finalData = buildFinalInvoice();
-  
+  console.log("Final data to save:", finalData);
     const isUpdate = !!data.id;
     const url = isUpdate 
       ? `${API_BASE_URL}/api/SaveInvoice/invoice` 
@@ -656,7 +657,6 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       payments: {
         ...data.payments,
         invoice_total: total,
-        invoice_balance: total - paid,
         line_items: (data.payments?.line_items ?? []).map(item => ({
           name: item.name,
           amount: Number(item.amount),

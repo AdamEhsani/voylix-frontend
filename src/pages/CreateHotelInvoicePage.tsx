@@ -56,7 +56,7 @@ export function CreateHotelInvoicePage() {
       invoice_paid_amount: 0,
       invoice_balance: 0,
       currency: "EUR",
-      payment_method: "Überweisung",
+      payment_method: "",
       payment_date: "",
       line_items: []
     },

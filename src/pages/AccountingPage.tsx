@@ -112,7 +112,7 @@ export function AccountingPage() {
   const filteredEntries = entries.filter(entry => {
     const matchesSearch = 
       entry.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entry.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      String(entry.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
       entry.method.toLowerCase().includes(searchTerm.toLowerCase());
 
     if (!matchesSearch) return false;
@@ -234,7 +234,7 @@ export function AccountingPage() {
 
       {/* Filters */}
       <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col md:flex-row gap-4">
-        <div className="relative flex-1">
+        <div className="relative flex-1 mt-6">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" size={18} />
           <input
             type="text"

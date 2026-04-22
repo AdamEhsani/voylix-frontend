@@ -45,7 +45,7 @@ export function CreateFlightInvoicePage() {
       segmentsBack: []
     },
     payments: {
-      payment_method: "Überweisung",
+      payment_method: "",
       invoice_status: "offen",
       invoice_total: 0,
       invoice_paid_amount: 0,
