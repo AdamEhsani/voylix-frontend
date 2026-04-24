@@ -607,7 +607,6 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
     const token = localStorage.getItem("token");
 
     const finalData = buildFinalInvoice();
-  console.log("Final data to save:", finalData);
     const isUpdate = !!data.id;
     const url = isUpdate 
       ? `${API_BASE_URL}/api/SaveInvoice/invoice` 

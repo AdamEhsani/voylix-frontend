@@ -100,6 +100,46 @@ export function CreateCustomerPage() {
         body: JSON.stringify(payload)
       });
 
+      // =========================
+      // HANDLE DUPLICATE (409)
+      // =========================
+      if (res.status === 409) {
+        const data = await res.json();
+
+        const confirm = window.confirm(
+          `Ein Kunde mit dieser E-Mail existiert bereits (${data.existingCustomer?.name}). Trotzdem erstellen?`
+        );
+
+        if (!confirm) return;
+
+        // ارسال مجدد با forceCreate
+        const res2 = await fetch(`${API_URL}/api/Customer`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            ...payload,
+            forceCreate: true
+          })
+        });
+
+        if (!res2.ok) {
+          const text = await res2.text();
+          console.error(text);
+          toast.error("Fehler beim Speichern des Kunden");
+          return;
+        }
+
+        toast.success("Kunde erfolgreich erstellt");
+        navigate('/customers');
+        return;
+      }
+
+      // =========================
+      // NORMAL FLOW
+      // =========================
       if (!res.ok) {
         const text = await res.text();
         console.error(text);
@@ -109,6 +149,7 @@ export function CreateCustomerPage() {
 
       toast.success("Kunde erfolgreich erstellt");
       navigate('/customers');
+
     } catch (err) {
       console.error(err);
       toast.error("Netzwerkfehler");
