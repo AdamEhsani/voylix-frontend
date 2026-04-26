@@ -179,17 +179,6 @@ export function LoginPage() {
             </button>
           </form>
         </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1 }}
-          className="mt-8 text-center"
-        >
-          <div className="inline-block px-4 py-2 bg-zinc-100 dark:bg-zinc-900 rounded-full text-[10px] font-bold uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-            Demo-Zugang: test@user.de / 123456
-          </div>
-        </motion.div>
       </motion.div>
     </div>
   );

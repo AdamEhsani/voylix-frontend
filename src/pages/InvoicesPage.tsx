@@ -18,10 +18,15 @@ import {
   X
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { formatCurrency, cn } from '../utils';
+import { formatCurrency, cn, formatDate } from '../utils';
 import { API_URL } from "../config/api";
+interface InvoicePassenger {
+  index: number | null;
+  fullName: string | null;
+}
+
 interface Invoice {
-  id: string;
+  id: number;
   number: string;
   customer: string;
   date: string;
@@ -29,10 +34,10 @@ interface Invoice {
   status: string;
   type: string;
   destination: string;
-  departur_time: string | null;
+  departureTime: string | null;
   user: string | null;
   userType: string | null;
-  passengers: []
+  passengers: InvoicePassenger[];
 }
 
 export function InvoicesPage() {
@@ -51,9 +56,8 @@ export function InvoicesPage() {
       setError(null);
       const token = localStorage.getItem("token");
 
-      // Note: Using the URL provided by the user. 
-      // In a real app, this might be an environment variable.
-      const res = await fetch(`${API_URL}/api/uploadedFiles`, {
+      // Endpoint jadid: az jadval Invoice (+ children) mikhune.
+      const res = await fetch(`${API_URL}/api/invoices`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -65,71 +69,27 @@ export function InvoicesPage() {
         throw new Error("Failed to load invoices");
       }
 
-      const data = await res.json();
-      const mapped = data.map((file: any) => {
-        const json =
-          typeof file.extractedJson === "string"
-            ? JSON.parse(file.extractedJson)
-            : file.extractedJson || {};
-            
-        const isHotel = json?.invoice_meta?.invoice_type === "Hotel";
+      const data: any[] = await res.json();
 
-        const segments = json?.flight_details?.segmentsTo;
+      const mapped: Invoice[] = data.map((row) => ({
+        id: row.id,
+        number: `R-${row.id}`,
+        customer: row.customer ?? "Unknown",
+        date: row.date ?? "",
+        amount: typeof row.amount === "number" ? row.amount : Number(row.amount ?? 0),
+        status: row.status ?? "offen",
+        type: row.type ?? "Flug",
+        destination: row.destination ?? "",
+        departureTime: row.departureTime ?? null,
+        user: row.user ?? "Unbekannt",
+        userType: row.userType ?? "Unbekannt",
+        passengers: Array.isArray(row.passengers) ? row.passengers : []
+      }));
 
-        const firstFlight = segments?.length
-          ? segments.reduce((min, s) =>
-            new Date(s.departure_time) < new Date(min.departure_time) ? s : min
-          )
-          : null;
-
-        const destinationHotel = json?.hotelDto?.location ?? null;
-
-        const dateHotel = json?.hotelDto?.check_in
-          ? new Date(json.hotelDto.check_in).toLocaleDateString("de-DE")
-          : null;
-
-        const destination = isHotel
-          ? destinationHotel
-          : segments?.length
-            ? segments[segments.length - 1]?.to?.airport
-            : null;
-
-        const date = isHotel
-          ? dateHotel
-          : firstFlight
-            ? new Date(firstFlight.departure_time).toLocaleDateString("de-DE")
-            : null;
-
-
-        return {
-          id: file.id,
-          number: json?.invoice_meta?.invoice_id ?? `R-${file.id}`,
-          customer:
-            json?.customer?.customer_name ??
-            json?.customer?.company_name ??
-            "Unknown",
-          date: date,
-          amount: json?.payments?.invoice_total ?? 0,
-          status: json?.payments?.invoice_status ?? "Offen",
-          type: json?.invoice_meta?.invoice_type ?? "Flug",
-          departur_time:
-            json?.booking?.travel_start_date ??
-            null,
-          destination: destination,
-          passengers: json?.passengers?.map((p: any) => ({
-            index: p.index,
-            fullName: p.first_name + " " + p.last_name,
-          })) ?? [],
-          user: `${json?.agencyUser?.Name ?? ""} ${json?.agencyUser?.NachName ?? ""}`.trim() || "Unbekannt",
-          userType: file.userType || "Unbekannt"
-        };
-      });
       setInvoices(mapped);
     } catch (err: any) {
       console.error("Error loading invoices:", err);
       setError(err.message || "An error occurred while loading invoices");
-      // Fallback to empty list or mock data if needed for demo purposes
-      // setInvoices([]); 
     } finally {
       setLoading(false);
     }

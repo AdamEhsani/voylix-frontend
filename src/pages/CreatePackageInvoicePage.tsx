@@ -11,13 +11,14 @@ export function CreatePackageInvoicePage() {
       invoice_type: "Package",
       invoice_number: `RE-P-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       invoice_id: `R-P-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-      invoice_date: new Date().toLocaleDateString('de-DE'),
+      invoice_date: new Date().toISOString().slice(0, 10),
       booking_reference: "",
       va_reference: "",
       language: "de"
     },
     customer: {
       customerNumber: "",
+      customer_name: "",
       company_name: "",
       company_type: "",
       email: "",
@@ -25,7 +26,7 @@ export function CreatePackageInvoicePage() {
       address: { street: "", postalCode: "", city: "", country: "" }
     },
     booking: {
-      booking_date: new Date().toLocaleDateString('de-DE'),
+      booking_date: new Date().toISOString().slice(0, 10),
       travel_start_date: "",
       travel_end_date: "",
       services: []

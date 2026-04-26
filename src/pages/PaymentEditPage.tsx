@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -7,46 +7,49 @@ import {
   Landmark,
   Check,
   AlertCircle,
-  Train
+  Train,
+  Trash2
 } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
-import { API_URL } from "../config/api";
+import { API_URL } from '../config/api';
 import { toast } from 'sonner';
 
-// Voylix: clean DTO ke AddPaymentController mifreste
-interface PaymentDetail {
+// Voylix: shape az PaymentsController.GetById
+interface PaymentEdit {
+  paymentId: number;
   invoiceId: number;
-  invoiceNumber?: string | null;
-  invoiceType?: string | null;
-  invoiceStatus?: string | null;
+  invoiceNumber: string;
+  customerId: number;
+  customerName: string;
+  amount: number;
+  method: string;
+  paymentDate: string;        // yyyy-MM-dd
+  createdAt: string;
   invoiceTotal: number;
   invoicePaidAmount: number;
   invoiceBalance: number;
-  currency?: string | null;
-  paymentMethod?: string | null;
-  paymentDate?: string | null;     // yyyy-MM-dd
-  customerId?: number | null;
-  customerName?: string | null;
+  invoiceStatus: string;
+  currency: string;
 }
 
-export function PaymentDetailPage() {
-  const { id } = useParams();
+export function PaymentEditPage() {
+  const { paymentId } = useParams();
   const navigate = useNavigate();
 
-  const [detail, setDetail]   = useState<PaymentDetail | null>(null);
+  const [detail, setDetail] = useState<PaymentEdit | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Form state
-  const [amount, setAmount]           = useState('');
-  const [method, setMethod]           = useState<string>('Überweisung');
-  const [paymentDate, setPaymentDate] = useState<string>(
-    new Date().toISOString().slice(0, 10) // default emrooz
-  );
-  const [isSaving, setIsSaving]       = useState(false);
+  const [amount, setAmount] = useState('');
+  const [method, setMethod] = useState<string>('Überweisung');
+  const [paymentDate, setPaymentDate] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const paymentMethods = [
-    { id: 'Überweisung', icon: Landmark,  label: 'Überweisung' },
+    { id: 'Überweisung', icon: Landmark,   label: 'Überweisung' },
     { id: 'Kreditkarte', icon: CreditCard, label: 'Kreditkarte' },
     { id: 'ICE Karte',   icon: Train,      label: 'ICE Karte'   },
     { id: 'Bar',         icon: Banknote,   label: 'Bar'         },
@@ -54,14 +57,14 @@ export function PaymentDetailPage() {
 
   // -------- Load --------
   useEffect(() => {
-    if (!id) return;
+    if (!paymentId) return;
 
     const fetchDetail = async () => {
       try {
         setLoading(true);
         const token = localStorage.getItem('token');
 
-        const res = await fetch(`${API_URL}/api/AddPayment/${id}`, {
+        const res = await fetch(`${API_URL}/api/Payments/${paymentId}`, {
           method: 'GET',
           headers: {
             'Content-Type':  'application/json',
@@ -71,12 +74,12 @@ export function PaymentDetailPage() {
 
         if (!res.ok) throw new Error('Fehler beim Laden');
 
-        const data = (await res.json()) as PaymentDetail;
+        const data = (await res.json()) as PaymentEdit;
         setDetail(data);
 
-        // method default az invoice begir agar dasht
-        if (data.paymentMethod) setMethod(data.paymentMethod);
-        if (data.paymentDate)   setPaymentDate(data.paymentDate);
+        setAmount(String(data.amount ?? ''));
+        setMethod(data.method || 'Überweisung');
+        setPaymentDate(data.paymentDate || new Date().toISOString().slice(0, 10));
       } catch (err: any) {
         setError(err.message ?? 'Fehler beim Laden');
       } finally {
@@ -85,11 +88,11 @@ export function PaymentDetailPage() {
     };
 
     fetchDetail();
-  }, [id]);
+  }, [paymentId]);
 
-  // -------- Save --------
+  // -------- Save (PUT) --------
   const handleSave = async () => {
-    if (!detail || !id) return;
+    if (!detail || !paymentId) return;
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) {
       toast.error('Bitte einen gültigen Betrag eingeben.');
@@ -104,8 +107,8 @@ export function PaymentDetailPage() {
     try {
       const token = localStorage.getItem('token');
 
-      const res = await fetch(`${API_URL}/api/AddPayment/${id}`, {
-        method: 'POST',
+      const res = await fetch(`${API_URL}/api/Payments/${paymentId}`, {
+        method: 'PUT',
         headers: {
           'Content-Type':  'application/json',
           'Authorization': `Bearer ${token}`,
@@ -113,21 +116,52 @@ export function PaymentDetailPage() {
         body: JSON.stringify({
           amount: amt,
           method: method,
-          date:   paymentDate,    // ISO yyyy-MM-dd
+          date:   paymentDate,
         }),
       });
 
       if (!res.ok) {
         const txt = await res.text();
-        throw new Error(txt || 'Zahlung konnte nicht gespeichert werden.');
+        throw new Error(txt || 'Zahlung konnte nicht aktualisiert werden.');
       }
 
-      toast.success('Zahlung wurde erfasst.');
+      toast.success('Zahlung wurde aktualisiert.');
       navigate('/accounting');
     } catch (err: any) {
       toast.error(err.message ?? 'Fehler beim Speichern');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // -------- Delete --------
+  const handleDelete = async () => {
+    if (!detail || !paymentId) return;
+
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem('token');
+
+      const res = await fetch(`${API_URL}/api/Payments/${paymentId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || 'Zahlung konnte nicht gelöscht werden.');
+      }
+
+      toast.success('Zahlung wurde gelöscht.');
+      navigate('/accounting');
+    } catch (err: any) {
+      toast.error(err.message ?? 'Fehler beim Löschen');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -144,7 +178,7 @@ export function PaymentDetailPage() {
     return (
       <div className="max-w-2xl mx-auto p-8 text-center space-y-4">
         <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
-        <p className="text-red-500 font-bold">{error ?? 'Rechnung nicht gefunden.'}</p>
+        <p className="text-red-500 font-bold">{error ?? 'Zahlung nicht gefunden.'}</p>
         <button
           onClick={() => navigate(-1)}
           className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 rounded-lg"
@@ -155,13 +189,19 @@ export function PaymentDetailPage() {
     );
   }
 
-  // -------- Derived numbers --------
-  const total      = Number(detail.invoiceTotal      ?? 0);
-  const alreadyPaid = Number(detail.invoicePaidAmount ?? 0);
-  const remaining  = Math.max(0, total - alreadyPaid);
-  const enteredAmt = parseFloat(amount) || 0;
-  const newPaid    = alreadyPaid + enteredAmt;
-  const newBalance = total - newPaid;
+  // -------- Derived (live re-calc preview) --------
+  const total          = Number(detail.invoiceTotal      ?? 0);
+  const currentPaid    = Number(detail.invoicePaidAmount ?? 0);
+  const originalAmount = Number(detail.amount            ?? 0);
+  const enteredAmt     = parseFloat(amount) || 0;
+
+  // jam-e jadid = jam-e ghadim - mablagh-e in payment + mablagh-e jadid
+  const newSumPaid = currentPaid - originalAmount + enteredAmt;
+  const newBalance = total - newSumPaid;
+  const newStatus  =
+    newSumPaid <= 0 ? 'offen'
+    : newSumPaid >= total ? 'bezahlt'
+    : 'teilweise_bezahlt';
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -173,12 +213,10 @@ export function PaymentDetailPage() {
           <ArrowLeft size={20} />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Bezahlt Detail</h1>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Zahlung bearbeiten</h1>
           <p className="text-sm text-zinc-500">
-            Zahlung erfassen für{' '}
-            <span className="font-semibold">
-              {detail.invoiceNumber ?? `RE-${detail.invoiceId}`}
-            </span>
+            Zahlung #{detail.paymentId} für{' '}
+            <span className="font-semibold">{detail.invoiceNumber}</span>
             {detail.customerName ? ` — ${detail.customerName}` : ''}
           </p>
         </div>
@@ -203,26 +241,33 @@ export function PaymentDetailPage() {
               />
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-              <p className="text-zinc-400 italic">Gesamtbetrag der Rechnung:</p>
+              <p className="text-zinc-400 italic">Rechnungssumme:</p>
               <p className="text-right font-semibold text-zinc-600 dark:text-zinc-300">
-                {formatCurrency(total)}
+                {formatCurrency(total, detail.currency)}
               </p>
-              <p className="text-zinc-400 italic">Bereits bezahlt:</p>
+              <p className="text-zinc-400 italic">Aktuell bezahlt (gesamt):</p>
               <p className="text-right font-semibold text-emerald-600">
-                {formatCurrency(alreadyPaid)}
+                {formatCurrency(currentPaid, detail.currency)}
               </p>
-              <p className="text-zinc-400 italic">Verbleibender Betrag:</p>
-              <p className="text-right font-semibold text-red-500">
-                {formatCurrency(remaining)}
+              <p className="text-zinc-400 italic">Ursprünglicher Betrag dieser Zahlung:</p>
+              <p className="text-right font-semibold text-zinc-600 dark:text-zinc-300">
+                {formatCurrency(originalAmount, detail.currency)}
               </p>
-              {enteredAmt > 0 && (
-                <>
-                  <p className="text-zinc-500 italic mt-1">Nach dieser Zahlung:</p>
-                  <p className="text-right font-bold mt-1 text-zinc-900 dark:text-white">
-                    {formatCurrency(Math.max(0, newBalance))} offen
-                  </p>
-                </>
-              )}
+              <p className="text-zinc-500 italic mt-2">Nach Änderung — neue Summe:</p>
+              <p className="text-right font-bold mt-2 text-zinc-900 dark:text-white">
+                {formatCurrency(Math.max(0, newSumPaid), detail.currency)}
+              </p>
+              <p className="text-zinc-500 italic">Neuer Restbetrag:</p>
+              <p className={cn(
+                "text-right font-bold",
+                newBalance > 0 ? "text-red-500" : "text-emerald-600"
+              )}>
+                {formatCurrency(Math.max(0, newBalance), detail.currency)}
+              </p>
+              <p className="text-zinc-500 italic">Neuer Status:</p>
+              <p className="text-right font-bold text-zinc-900 dark:text-white">
+                {newStatus}
+              </p>
             </div>
           </div>
 
@@ -269,13 +314,21 @@ export function PaymentDetailPage() {
           <div className="p-4 bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl flex gap-3">
             <AlertCircle className="text-blue-500 shrink-0" size={20} />
             <p className="text-sm text-blue-700 dark:text-blue-300">
-              Die Zahlung wird sofort verbucht und der Status der Rechnung auf "bezahlt" oder "teilweise_bezahlt" aktualisiert.
+              Beim Speichern wird die Rechnung automatisch neu berechnet (Bezahlt / Restbetrag / Status).
             </p>
           </div>
         </div>
 
         {/* Action Footer */}
-        <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-100 dark:border-zinc-800 flex gap-3">
+        <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={isSaving || isDeleting}
+            className="px-4 py-3 bg-white dark:bg-zinc-900 border border-red-200 dark:border-red-900/30 text-red-600 font-bold rounded-xl hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center justify-center gap-2"
+          >
+            <Trash2 size={18} />
+            Löschen
+          </button>
           <button
             onClick={() => navigate(-1)}
             className="flex-1 px-6 py-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold rounded-xl hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors"
@@ -284,7 +337,7 @@ export function PaymentDetailPage() {
           </button>
           <button
             onClick={handleSave}
-            disabled={isSaving || !amount || !paymentDate}
+            disabled={isSaving || isDeleting || !amount || !paymentDate}
             className="flex-[2] px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
           >
             {isSaving ? (
@@ -296,6 +349,46 @@ export function PaymentDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* Delete Confirm Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <AlertCircle className="text-red-500" size={20} />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                Zahlung löschen?
+              </h3>
+            </div>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Möchten Sie diese Zahlung wirklich löschen? Die Rechnung wird automatisch neu berechnet.
+            </p>
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {isDeleting ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Trash2 size={16} />
+                )}
+                Löschen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

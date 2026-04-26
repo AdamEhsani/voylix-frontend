@@ -2,8 +2,30 @@ import { API_URL } from "../config/api";
 import React from 'react';
 import { Printer } from 'lucide-react';
 import { InvoiceDesignerSettings, TravelInvoice } from '../types';
-import { cn } from '../utils';
+import { cn, formatDate } from '../utils';
 import LogoAgency from './LogoAgency';
+
+// Voylix: datetime ro be format DE neshon bedim "DD.MM.YYYY HH:mm"
+const formatDateTime = (s?: string | null): string => {
+  if (!s) return '';
+  const str = String(s).trim();
+  if (!str) return '';
+  // age YYYY-MM-DD ya YYYY-MM-DDTHH:mm bashe Date(...) khob parse mikone
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    // age sa'at sefr-sefr bashe yani fght date dade shod, time neshon nadim
+    if (hh === '00' && mi === '00' && !/T|\s\d{2}:\d{2}/.test(str)) {
+      return `${dd}.${mm}.${yyyy}`;
+    }
+    return `${dd}.${mm}.${yyyy} ${hh}:${mi}`;
+  }
+  return str;
+};
 
 interface InvoicePreviewProps {
   data: TravelInvoice;
@@ -93,7 +115,17 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
             <div className={cn(customerBlockPosition === 'right' && "order-2")}>
               <p className="text-[8px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Rechnungsempfänger</p>
               <div className="space-y-0.5">
-                <p className="font-bold text-base">{data.customer?.company_name}</p>
+                {/* Voylix: agar Firma exist konad — Firma bala, Name pain. Vagarna faghat Name. */}
+                {data.customer?.company_name ? (
+                  <>
+                    <p className="font-bold text-base">{data.customer.company_name}</p>
+                    {data.customer?.customer_name && (
+                      <p className="text-[10px]">{data.customer.customer_name}</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="font-bold text-base">{data.customer?.customer_name}</p>
+                )}
                 <p className="text-[10px]">{data.customer?.address?.street}</p>
                 <p className="text-[10px]">{data.customer?.address?.postalCode} {data.customer?.address?.city}</p>
                 <p className="text-[10px]">{data.customer?.address?.country}</p>
@@ -106,7 +138,7 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                 <span className="text-zinc-400 font-medium">Rechnungsnummer:</span>
                 <span className="font-bold">{'R-' + data.id}</span>
                 <span className="text-zinc-400 font-medium">Datum:</span>
-                <span className="font-bold">{data.invoice_meta?.invoice_date}</span>
+                <span className="font-bold">{formatDate(data.invoice_meta?.invoice_date ?? null)}</span>
                 <span className="text-zinc-400 font-medium">Kundennummer:</span>
                 <span className="font-bold">{"C-" + data.customer?.customerNumber}</span>
               </div>
@@ -156,7 +188,7 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-zinc-50 border-b border-zinc-100">
-                          <th className="px-3 py-1 text-[8px] font-bold text-zinc-400 uppercase w-16">{label}</th>
+                          <th className="px-3 py-1 text-[8px] font-bold text-zinc-400 uppercase whitespace-nowrap" style={{ width: '110px' }}>{label}</th>
                           <th className="px-3 py-1 text-[8px] font-bold text-zinc-500 uppercase">Airline</th>
                           <th className="px-3 py-1 text-[8px] font-bold text-zinc-500 uppercase">Strecke</th>
                           <th className="px-3 py-1 text-[8px] font-bold text-zinc-500 uppercase text-right">Abflug / Ankunft</th>
@@ -165,13 +197,13 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                       <tbody className="divide-y divide-zinc-50">
                         {segments.map((s, i) => (
                           <tr key={i} className="text-[9.5px]">
-                            <td className="px-3 py-1 text-zinc-700 font-bold">{s.flight_number}</td>
+                            <td className="px-3 py-1 text-zinc-700 font-bold whitespace-nowrap">{s.flight_number}</td>
                             <td className="px-3 py-1 text-zinc-700">{s.airline || data.flight_details.airline}</td>
                             <td className="px-3 py-1 text-zinc-700">{s.from?.airport} → {s.to?.airport}</td>
                             <td className="px-3 py-1 text-right text-zinc-700 whitespace-nowrap">
-                              <span className="px-3 py-1 text-zinc-700">{s.departure_time}</span>
+                              <span className="px-3 py-1 text-zinc-700">{formatDateTime(s.departure_time)}</span>
                               <span className="mx-1 text-zinc-300">/</span>
-                              <span>{s.arrival_time}</span>
+                              <span>{formatDateTime(s.arrival_time)}</span>
                             </td>
                           </tr>
                         ))}
@@ -204,12 +236,12 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
 
                 <div>
                   <p className="text-[8px] font-bold text-zinc-400 uppercase mb-0.5">Check-In</p>
-                  <p className="font-bold text-[9.5px]">{data.hotelDto.check_in}</p>
+                  <p className="font-bold text-[9.5px]">{formatDate(data.hotelDto.check_in ?? null)}</p>
                 </div>
 
                 <div>
                   <p className="text-[8px] font-bold text-zinc-400 uppercase mb-0.5">Check-Out</p>
-                  <p className="font-bold text-[9.5px]">{data.hotelDto.check_out}</p>
+                  <p className="font-bold text-[9.5px]">{formatDate(data.hotelDto.check_out ?? null)}</p>
                 </div>
 
                 <div>
@@ -294,7 +326,7 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
             <div className="grid grid-cols-3 gap-8 text-[8px] text-zinc-400 leading-normal">
               <div>
                 <p className="font-bold text-zinc-900 uppercase mb-1">Zahlungsinformationen</p>
-                <p>Bitte überweisen Sie den Betrag bis zum {data.payments?.payment_date}.</p>
+                <p>Bitte überweisen Sie den Betrag bis zum {formatDate(data.payments?.payment_date ?? null)}.</p>
                 <p>IBAN: DE12 3456 7890 1234 5678 90</p>
                 <p>BIC: GENO DE F1 M01</p>
               </div>
@@ -318,10 +350,12 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
     }
   };
 
+  const isStorniert = data.payments?.invoice_status === 'storniert';
+
   return (
     <div
       className={cn(
-        "w-full flex-1 flex flex-col bg-white text-zinc-900 print:h-auto print:min-h-0",
+        "relative w-full flex-1 flex flex-col bg-white text-zinc-900 print:h-auto print:min-h-0",
         alignment === 'center' && "text-center"
       )}
       style={{
@@ -329,6 +363,31 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
         fontFamily: "'Inter', sans-serif",
       }}
     >
+      {/* Voylix: Storno-Wasserzeichen — sowohl on-screen ham roy print neshon dade mishe */}
+      {isStorniert && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center overflow-hidden"
+          style={{ printColorAdjust: 'exact', WebkitPrintColorAdjust: 'exact' as any }}
+        >
+          <span
+            className="font-extrabold tracking-widest uppercase select-none"
+            style={{
+              color: 'rgba(220, 38, 38, 0.18)',
+              border: '8px solid rgba(220, 38, 38, 0.18)',
+              padding: '12px 40px',
+              borderRadius: '12px',
+              transform: 'rotate(-22deg)',
+              fontSize: '96px',
+              letterSpacing: '0.15em',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Storniert
+          </span>
+        </div>
+      )}
+
       <div className="p-6 flex flex-col min-h-[275mm]">
         {sectionOrdering.map(section => renderSection(section))}
       </div>

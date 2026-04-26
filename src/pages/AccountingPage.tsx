@@ -15,20 +15,36 @@ import {
   CreditCard,
   Banknote,
   ArrowUpRight,
-  X
+  X,
+  Eye
 } from 'lucide-react';
-import { formatCurrency, cn } from '../utils';
+import { formatCurrency, cn, formatDate } from '../utils';
 import { Link } from 'react-router-dom';
+// Voylix: yek row per Payment.
 interface AccountingEntry {
-  id: string;
+  id: number;             // paymentId — unique per row
+  invoiceId: number;
   invoiceNumber: string;
   customerName: string;
-  date: string;
-  totalAmount: number;
-  paidAmount: number;
-  balance: number;
+  date: string;           // formatted DD.MM.YYYY
+  amount: number;         // in payment
   method: string;
-  status: string;
+  invoiceTotal: number;
+  invoiceBalance: number;
+  currency: string;
+}
+
+// Shape ke loadAccountingDataController mifreste (camelCase)
+interface AccountingRowApi {
+  paymentId: number;
+  invoiceId: number;
+  invoiceNumber: string;
+  customerName: string;
+  date: string;           // ISO datetime
+  amount: number;
+  method: string;
+  invoiceTotal: number;
+  invoiceBalance: number;
   currency: string;
 }
 import { API_URL } from '../config/api';
@@ -48,7 +64,7 @@ export function AccountingPage() {
       setError(null);
       const token = localStorage.getItem("token");
 
-      const res = await fetch(`${API_URL}/api/uploadedFiles`, {
+      const res = await fetch(`${API_URL}/api/loadAccountingData`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -60,39 +76,33 @@ export function AccountingPage() {
         throw new Error("Failed to load accounting data");
       }
 
-      const data = await res.json();
+      const data = (await res.json()) as AccountingRowApi[];
 
-      const mapped = data.map((file: any) => {
-        const json =
-          typeof file.extractedJson === "string"
-            ? JSON.parse(file.extractedJson)
-            : file.extractedJson || {};
-
-        const payments = json?.payments || {};
-        const customer = json?.customer || {};
-
-        const rawMethod = payments?.payment_method ?? "";
+      // Voylix: yek row per Payment.
+      const mapped: AccountingEntry[] = data.map((row) => {
+        const rawMethod = (row.method ?? "").toString();
         const normalized = rawMethod.toLowerCase();
-
         const allowedMethod =
           normalized.includes("bar") ||
-            normalized.includes("kreditkarte") ||
-            normalized.includes("ice karte") ||
-            normalized.includes("überweisung")
+          normalized.includes("kreditkarte") ||
+          normalized.includes("ice karte") ||
+          normalized.includes("überweisung")
             ? rawMethod
-            : "-";
+            : rawMethod || "-";
 
         return {
-          id: file.id,
-          invoiceNumber: json?.invoice_meta?.invoice_number ?? `INV-${file.id}`,
-          customerName: customer?.customer_name ?? customer?.company_name ?? "Unbekannt",
-          totalAmount: parseFloat(payments?.invoice_total) || 0,
-          paidAmount: parseFloat(payments?.invoice_paid_amount) || 0,
-          balance: parseFloat(payments?.invoice_balance) || 0,
-          method: allowedMethod,
-          status: payments?.invoice_status ?? "Offen",
-          currency: payments?.currency ?? "EUR",
-          date: payments?.payment_date ? payments.payment_date : new Date(file.createdAt).toLocaleDateString("de-DE")
+          id:             row.paymentId,
+          invoiceId:      row.invoiceId,
+          invoiceNumber:  row.invoiceNumber,
+          customerName:   row.customerName ?? "Unbekannt",
+          amount:         Number(row.amount)         || 0,
+          method:         allowedMethod,
+          invoiceTotal:   Number(row.invoiceTotal)   || 0,
+          invoiceBalance: Number(row.invoiceBalance) || 0,
+          currency:       row.currency      || "EUR",
+          date: row.date
+            ? new Date(row.date).toLocaleDateString("de-DE")
+            : "",
         };
       });
 
@@ -110,10 +120,12 @@ export function AccountingPage() {
   }, []);
 
   const filteredEntries = entries.filter(entry => {
-    const matchesSearch = 
-      entry.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      String(entry.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entry.method.toLowerCase().includes(searchTerm.toLowerCase());
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      entry.customerName.toLowerCase().includes(term) ||
+      entry.invoiceNumber.toLowerCase().includes(term) ||
+      String(entry.invoiceId).includes(term) ||
+      entry.method.toLowerCase().includes(term);
 
     if (!matchesSearch) return false;
 
@@ -158,9 +170,21 @@ export function AccountingPage() {
   });
 
   // Stats
-  const totalRevenue = filteredEntries.reduce((acc, curr) => acc + curr.totalAmount, 0);
-  const totalPaid = filteredEntries.reduce((acc, curr) => acc + curr.paidAmount, 0);
-  const totalOutstanding = filteredEntries.reduce((acc, curr) => acc + curr.balance, 0);
+  // totalPaid = jam-e hame Payment-haye filter-shode (har row 1 payment).
+  // totalRevenue va totalOutstanding bayad bedun-e tekrar bashan (per invoice yekbar).
+  const totalPaid = filteredEntries.reduce((acc, curr) => acc + curr.amount, 0);
+
+  const uniqueInvoices = new Map<number, { total: number; balance: number }>();
+  filteredEntries.forEach((e) => {
+    if (!uniqueInvoices.has(e.invoiceId)) {
+      uniqueInvoices.set(e.invoiceId, {
+        total:   e.invoiceTotal,
+        balance: e.invoiceBalance,
+      });
+    }
+  });
+  const totalRevenue     = Array.from(uniqueInvoices.values()).reduce((a, b) => a + b.total,   0);
+  const totalOutstanding = Array.from(uniqueInvoices.values()).reduce((a, b) => a + b.balance, 0);
 
   // Pagination logic
   const totalItems = filteredEntries.length;
@@ -168,13 +192,6 @@ export function AccountingPage() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
   const currentEntries = filteredEntries.slice(startIndex, startIndex + itemsPerPage);
-
-  const getStatusStyles = (status: string) => {
-    const s = status.toLowerCase();
-    if (s === 'bezahlt') return "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800";
-    if (s === 'offen') return "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-800";
-    return "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-red-100 dark:border-red-800";
-  };
 
   const getMethodIcon = (method: string) => {
     if (!method) return null;
@@ -219,7 +236,7 @@ export function AccountingPage() {
             </div>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Eingegangen</span>
           </div>
-          <p className="text-2xl font-bold text-zinc-900 dark:text-white">{formatCurrency(totalOutstanding)}</p>
+          <p className="text-2xl font-bold text-zinc-900 dark:text-white">{formatCurrency(totalPaid)}</p>
         </div>
         <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -228,7 +245,7 @@ export function AccountingPage() {
             </div>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Offen</span>
           </div>
-          <p className="text-2xl font-bold text-zinc-900 dark:text-white">{formatCurrency(totalRevenue - totalOutstanding)}</p>
+          <p className="text-2xl font-bold text-zinc-900 dark:text-white">{formatCurrency(totalOutstanding)}</p>
         </div>
       </div>
 
@@ -295,11 +312,11 @@ export function AccountingPage() {
                 <th className="px-6 py-4">Kunde</th>
                 <th className="px-6 py-4">Rechnung</th>
                 <th className="px-6 py-4">Datum</th>
-                <th className="px-6 py-4">Gesamt</th>
-                <th className="px-6 py-4">Bezahlt</th>
+                <th className="px-6 py-4">Rg.-Summe</th>
+                <th className="px-6 py-4">Diese Zahlung</th>
                 <th className="px-6 py-4">Restbetrag</th>
                 <th className="px-6 py-4">Methode</th>
-                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Aktionen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -343,23 +360,28 @@ export function AccountingPage() {
                       <span className="text-sm font-bold text-zinc-900 dark:text-white">{entry.customerName}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-zinc-500">R-{entry.id}</span>
+                      <span className="text-sm text-zinc-500">{entry.invoiceId}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-zinc-500">{entry.date}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm font-bold text-zinc-900 dark:text-white">{formatCurrency(entry.totalAmount, entry.currency)}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-emerald-600 font-medium">{formatCurrency(entry.balance, entry.currency)}</span>
+                      <span className="text-sm font-bold text-zinc-900 dark:text-white">{formatCurrency(entry.invoiceTotal, entry.currency)}</span>
                     </td>
                     <td className="px-6 py-4">
                       <span className={cn(
                         "text-sm font-bold",
-                        entry.paidAmount > 0 ? "text-red-500" : "text-zinc-400"
+                        entry.amount > 0 ? "text-emerald-600" : "text-zinc-400"
                       )}>
-                        {formatCurrency(entry.paidAmount, entry.currency)}
+                        {formatCurrency(entry.amount, entry.currency)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={cn(
+                        "text-sm font-bold",
+                        entry.invoiceBalance > 0 ? "text-red-500" : "text-zinc-400"
+                      )}>
+                        {formatCurrency(entry.invoiceBalance, entry.currency)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -368,17 +390,13 @@ export function AccountingPage() {
                         {entry.method}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 text-right">
                       <Link
-                        to={`/payment/${entry.id}`}
-                        className={cn(
-                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer",
-                          entry.status.toLowerCase() === 'bezahlt' ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" :
-                            entry.status.toLowerCase() === 'offen' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" :
-                              "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
-                        )}
+                        to={`/payment-edit/${entry.id}`}
+                        title="Zahlung ansehen / bearbeiten"
+                        className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-zinc-50 dark:bg-zinc-800 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border border-zinc-200 dark:border-zinc-700 hover:border-emerald-200 transition-all"
                       >
-                        {entry.status}
+                        <Eye size={16} />
                       </Link>
                     </td>
                   </tr>

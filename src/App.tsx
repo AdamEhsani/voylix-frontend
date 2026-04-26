@@ -23,6 +23,7 @@ const TokenPage = lazy(() => import('./pages/TokenPage').then(m => ({ default: m
 const AgencyProfilePage = lazy(() => import('./pages/AgencyProfilePage').then(m => ({ default: m.AgencyProfilePage })));
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const PaymentDetailPage = lazy(() => import('./pages/PaymentDetailPage').then(m => ({ default: m.PaymentDetailPage })));
+const PaymentEditPage = lazy(() => import('./pages/PaymentEditPage').then(m => ({ default: m.PaymentEditPage })));
 const PdfImportPage = lazy(() => import('./pages/PdfImportPage').then(m => ({ default: m.PdfImportPage })));
 
 function PageLoader() {
@@ -54,6 +55,7 @@ export default function App() {
                   <Route path="/invoices/:id" element={<InvoiceDetailPage />} />
                   <Route path="/invoices/designer" element={<InvoiceDesignerPage />} />
                   <Route path="/payment/:id" element={<PaymentDetailPage />} />
+                  <Route path="/payment-edit/:paymentId" element={<PaymentEditPage />} />
                   <Route path="/pdf-import" element={<PdfImportPage />} />
                   <Route path="/tokens" element={<TokenPage />} />
                   <Route path="/agency" element={<AgencyProfilePage />} />

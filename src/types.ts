@@ -127,8 +127,10 @@ export interface TravelInvoice {
   id?: string;
   invoice_meta: InvoiceMeta;
   customer: {
+    customer_id?: string | null;
     customerNumber: string;
-    company_name: string;
+    customer_name: string;        // Voylix: FirstName + LastName (hamishe ham az backend miad)
+    company_name: string;         // Voylix: faghat agar Customer.Company exist konad
     company_type: string;
     address: Address;
     email: string;
@@ -226,6 +228,16 @@ export interface BackendCustomer {
   street: string;
   country: string;
   customerNumber: string;
+  // Voylix: az backend (CustomerController.GetCustomers) miad agar Customer ye Company dashte bashe.
+  company?: {
+    id: number;
+    name: string | null;
+    street: string | null;
+    city: string | null;
+    postalCode: string | null;
+    country: string | null;
+    phone: string | null;
+  } | null;
 }
 
 export interface TokenTransaction {

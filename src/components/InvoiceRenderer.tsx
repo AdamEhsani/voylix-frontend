@@ -33,6 +33,34 @@ interface InvoiceRendererProps {
   onSave?: () => void
 }
 const API_BASE_URL = API_URL;
+
+// Voylix: har format-i ke biad (YYYY-MM-DD, ISO ba time, DD.MM.YYYY, DD/MM/YYYY)
+// ro be `YYYY-MM-DD` tabdil mikone — chon <input type="date"> faghat hamin ro mifahmid.
+const toIsoDate = (s?: string | null): string => {
+  if (!s) return '';
+  const str = String(s).trim();
+  if (!str) return '';
+  // ISO ya datetime-local: avalin 10 character agar matchi YYYY-MM-DD bashe
+  const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  // DD.MM.YYYY ya DD/MM/YYYY ya DD-MM-YYYY (ba ya bedone time)
+  const eu = str.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
+  if (eu) {
+    const dd = eu[1].padStart(2, '0');
+    const mm = eu[2].padStart(2, '0');
+    return `${eu[3]}-${mm}-${dd}`;
+  }
+  // fallback: bzar `Date` constructor parse kone
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  return '';
+};
+
 export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps) {
 
   if (!data) return null
@@ -49,6 +77,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
   const customer = data.customer ?? {
     customerNumber: '',
+    customer_name: '',
     company_name: '',
     company_type: '',
     email: '',
@@ -286,6 +315,51 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       loadCustomers();
     }
   }, [isCustomerModalOpen]);
+
+  // Voylix: invoice_date / hotel.check_in / hotel.check_out ro be YYYY-MM-DD normalize kon.
+  // age invoice_date khali bud, ba tarikh-e emrooz por kon (ghabel-e edit ham hast).
+  useEffect(() => {
+    if (!data) return;
+
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const rawInvDate   = (data.invoice_meta?.invoice_date ?? '').trim();
+    const isoInvDate   = toIsoDate(rawInvDate) || todayIso;
+
+    const rawCheckIn   = (data.hotelDto?.check_in  ?? '').trim();
+    const rawCheckOut  = (data.hotelDto?.check_out ?? '').trim();
+    const isoCheckIn   = toIsoDate(rawCheckIn);
+    const isoCheckOut  = toIsoDate(rawCheckOut);
+
+    const needsInvDateFix   = rawInvDate !== isoInvDate;
+    const needsCheckInFix   = !!rawCheckIn  && rawCheckIn  !== isoCheckIn;
+    const needsCheckOutFix  = !!rawCheckOut && rawCheckOut !== isoCheckOut;
+
+    if (!needsInvDateFix && !needsCheckInFix && !needsCheckOutFix) return;
+
+    onUpdate({
+      ...data,
+      invoice_meta: {
+        ...(data.invoice_meta ?? {
+          invoice_type: 'Flug',
+          invoice_number: '',
+          invoice_id: '',
+          invoice_date: '',
+          booking_reference: '',
+          va_reference: '',
+          language: 'de',
+        }),
+        invoice_date: isoInvDate,
+      },
+      hotelDto: data.hotelDto
+        ? {
+            ...data.hotelDto,
+            check_in:  needsCheckInFix  ? isoCheckIn  : data.hotelDto.check_in,
+            check_out: needsCheckOutFix ? isoCheckOut : data.hotelDto.check_out,
+          }
+        : data.hotelDto,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.id]);
 
   const updateInvoiceMeta = (field: string, value: any) => {
     onUpdate({
@@ -539,20 +613,33 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
   const handleSelectCustomer = (selected: BackendCustomer) => {
     const fullName = `${selected.firstName} ${selected.lastName}`.trim();
     if (pickingFor === 'customer') {
+      const hasCompany = !!selected.company?.name;
+      // Voylix: agar Customer Company dashte bashe — address-e Company ham eshare mishe.
+      const addr = hasCompany
+        ? {
+            street:     selected.company?.street     ?? selected.street     ?? '',
+            postalCode: selected.company?.postalCode ?? selected.postalCode ?? '',
+            city:       selected.company?.city       ?? selected.city       ?? '',
+            country:    selected.company?.country    ?? selected.country    ?? '',
+          }
+        : {
+            street:     selected.street,
+            postalCode: selected.postalCode,
+            city:       selected.city,
+            country:    selected.country,
+          };
+
       onUpdate({
         ...data,
         customer: {
+          customer_id:    String(selected.id ?? ""),
           customerNumber: String(selected.customerNumber || ""),
-          company_name: fullName,
-          company_type: '',
-          email: selected.email,
-          phone: selected.phone,
-          address: {
-            street: selected.street,
-            postalCode: selected.postalCode,
-            city: selected.city,
-            country: selected.country
-          }
+          customer_name:  fullName,
+          company_name:   selected.company?.name ?? '',
+          company_type:   '',
+          email:          selected.email,
+          phone:          hasCompany ? (selected.company?.phone ?? selected.phone) : selected.phone,
+          address:        addr
         }
       })
     } else {
@@ -609,10 +696,12 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
     const fullName = `${c.firstName ?? ''} ${c.lastName ?? ''}`.toLowerCase();
     const email = c.email?.toLowerCase() ?? '';
     const phone = c.phone?.toLowerCase() ?? '';
+    const company = c.company?.name?.toLowerCase() ?? '';
     return (
       fullName.includes(term) ||
       email.includes(term) ||
       phone.includes(term) ||
+      company.includes(term) ||
       String(c.id).includes(term)
     );
   });
@@ -620,6 +709,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
   const handleSave = async () => {
     // Validate customer (Rechnungsempfänger)
     const hasCustomer = !!(
+      customer?.customer_name?.trim() ||
       customer?.company_name?.trim() ||
       customer?.email?.trim() ||
       customer?.phone?.trim() ||
@@ -638,11 +728,23 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
     const token = localStorage.getItem("token");
     const finalData = buildFinalInvoice();
-
+    console.log("Final invoice data to save:", finalData);
     const isUpdate = !!data.id;
-    const url = isUpdate
-      ? `${API_BASE_URL}/api/SaveInvoice/invoice`
-      : `${API_BASE_URL}/api/CreateInvoice/invoice`;
+
+    // Voylix: bar asase invoice_type be endpoint-e dorost POST kon
+    let url: string;
+    if (isUpdate) {
+      url = `${API_BASE_URL}/api/SaveInvoice/invoice`;
+    } else {
+      const t = (data.invoice_meta?.invoice_type ?? '').toLowerCase();
+      if (t === 'hotel') {
+        url = `${API_BASE_URL}/api/CreateHotelInvoice/invoice`;
+      } else if (t === 'package' || t === 'pauschal') {
+        url = `${API_BASE_URL}/api/CreatePackageInvoice/invoice`;
+      } else {
+        url = `${API_BASE_URL}/api/CreateInvoice/invoice`;
+      }
+    }
 
     try {
       const res = await fetch(url, {
@@ -668,13 +770,77 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
   const buildFinalInvoice = () => {
     const total = Number(invoiceTotal || 0);
     const paid = Number(data.payments?.invoice_paid_amount || 0);
+
+    // Voylix: booking ro automatic az data-haye dige por kon
+    const todayIso = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const toDateOnly = (s?: string | null): string => {
+      if (!s) return '';
+      const str = String(s).trim();
+      // YYYY-MM-DD prefix (ISO ya datetime-local)
+      const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+      // DD.MM.YYYY ya DD/MM/YYYY (ba sa'at ya bedone sa'at)
+      const eu = str.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
+      if (eu) {
+        const dd = eu[1].padStart(2, '0');
+        const mm = eu[2].padStart(2, '0');
+        return `${eu[3]}-${mm}-${dd}`;
+      }
+      return '';
+    };
+
+    const segsTo   = data.flight_details?.segmentsTo ?? [];
+    const segsBack = data.flight_details?.segmentsBack ?? [];
+
+    const firstDepartureRaw =
+      segsTo.length > 0 ? segsTo[0]?.departure_time : '';
+    const lastArrivalRaw =
+      segsBack.length > 0
+        ? segsBack[segsBack.length - 1]?.arrival_time
+        : (segsTo.length > 0 ? segsTo[segsTo.length - 1]?.arrival_time : '');
+
+    const checkIn  = data.hotelDto?.check_in  ?? '';
+    const checkOut = data.hotelDto?.check_out ?? '';
+
+    const invType = (data.invoice_meta?.invoice_type ?? '').toLowerCase();
+
+    // travel_start / travel_end ra bar asas-e no-e factor entekhab kon
+    let travelStart = '';
+    let travelEnd   = '';
+    if (invType === 'hotel') {
+      travelStart = toDateOnly(checkIn);
+      travelEnd   = toDateOnly(checkOut);
+    } else if (invType === 'package' || invType === 'pauschal') {
+      travelStart = toDateOnly(checkIn) || toDateOnly(firstDepartureRaw);
+      travelEnd   = toDateOnly(checkOut) || toDateOnly(lastArrivalRaw);
+    } else {
+      // Flug
+      travelStart = toDateOnly(firstDepartureRaw);
+      travelEnd   = toDateOnly(lastArrivalRaw);
+    }
+
+    const invoiceDate = toDateOnly(data.invoice_meta?.invoice_date) || todayIso;
+    const bookingDate =
+      toDateOnly((data as any).booking?.booking_date) || invoiceDate;
+
+    const finalBooking = {
+      booking_date:       bookingDate,
+      travel_start_date:  travelStart,
+      travel_end_date:    travelEnd,
+      service_description: (data as any).booking?.service_description ?? '',
+    };
+
     return {
       ...data,
       id: data.id ? Number(data.id) : undefined,
-      invoice_meta: { ...data.invoice_meta },
+      invoice_meta: { ...data.invoice_meta, invoice_date: invoiceDate },
+      booking: finalBooking,
       customer: {
         ...data.customer,
+        customer_id:    data.customer?.customer_id ? String(data.customer.customer_id) : undefined,
         customerNumber: String(data.customer?.customerNumber ?? ""),
+        customer_name:  data.customer?.customer_name ?? '',
+        company_name:   data.customer?.company_name ?? '',
         address: { ...data.customer?.address },
       },
       passengers: (data.passengers ?? []).map(p => ({
@@ -707,9 +873,9 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
           amount: Number(item.amount),
         })),
       },
-      agencyUser: {
-        ...data.agencyUser
-      },
+      // Voylix: agencyUser asalan be body nemifrestim — server az JWT mikhune.
+      // (ghablan `id:""` ba `int Id` deserialize nemishod va 400 midad)
+      agencyUser: undefined,
       system_meta: { ...data.system_meta },
       legal_notes: { ...data.legal_notes },
     };
@@ -766,10 +932,10 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] text-zinc-500 uppercase font-bold">Datum:</span>
                 <input
-                  value={invoiceMeta?.invoice_date ?? ''}
+                  type="date"
+                  value={toIsoDate(invoiceMeta?.invoice_date)}
                   onChange={e => updateInvoiceMeta('invoice_date', e.target.value)}
                   className="text-xs text-right bg-transparent border-b border-transparent hover:border-zinc-200 focus:border-emerald-500 outline-none w-32 transition-colors"
-                  placeholder="DD.MM.YYYY"
                 />
               </div>
             </div>
@@ -795,13 +961,23 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Name / Firma</label>
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Name</label>
+              <input
+                readOnly
+                value={customer?.customer_name ?? ''}
+                onChange={e => updateCustomer('customer_name', e.target.value)}
+                className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
+                placeholder="Vor- und Nachname"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Firma <span className="text-zinc-400 font-normal normal-case">(optional)</span></label>
               <input
                 readOnly
                 value={customer?.company_name ?? ''}
                 onChange={e => updateCustomer('company_name', e.target.value)}
                 className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
-                placeholder="Name"
+                placeholder="—"
               />
             </div>
             <div className="space-y-1.5">
@@ -1168,7 +1344,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                 <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Check-In</label>
                 <input
                   type="date"
-                  value={hotelDetails.check_in ?? ''}
+                  value={toIsoDate(hotelDetails.check_in)}
                   onChange={e => updateHotelDetails('check_in', e.target.value)}
                   className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
                   placeholder="DD.MM.YYYY"
@@ -1178,7 +1354,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                 <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-tight">Check-Out</label>
                 <input
                   type="date"
-                  value={hotelDetails.check_out ?? ''}
+                  value={toIsoDate(hotelDetails.check_out)}
                   onChange={e => updateHotelDetails('check_out', e.target.value)}
                   className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-emerald-500 transition-all"
                   placeholder="DD.MM.YYYY"
@@ -1395,7 +1571,14 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                             <User size={20} />
                           </div>
                           <div>
-                            <p className="font-bold text-zinc-900 dark:text-white">{customer.firstName} {customer.lastName}</p>
+                            <p className="font-bold text-zinc-900 dark:text-white">
+                              {customer.firstName} {customer.lastName}
+                              {customer.company?.name && (
+                                <span className="ml-2 text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 py-0.5 rounded">
+                                  {customer.company.name}
+                                </span>
+                              )}
+                            </p>
                             <p className="text-xs text-zinc-500">
                               {customer.email} • {customer.city}
                             </p>

@@ -70,7 +70,8 @@ const MOCK_INVOICE: TravelInvoice = {
   },
   customer: {
     customerNumber: 'C-1001',
-    company_name: 'Max Mustermann',
+    customer_name: 'Max Mustermann',
+    company_name: '',
     company_type: 'Privat',
     email: '',
     phone: '',

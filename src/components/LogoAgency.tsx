@@ -14,14 +14,15 @@ export default function LogoAgency({ logoSize = 80, logoPosition = 'left', class
 
   return (
     <div
-      className={`relative dark:bg-zinc-800 rounded-3xl flex items-center justify-center text-zinc-400 overflow-hidden border-4 border-white dark:border-zinc-900 ${className}`}
-      style={{ width: logoSize, height: logoSize }}
+      className={`relative flex items-center justify-center text-zinc-400 ${className}`}
+      style={{ width: logoSize, height: logoSize, background: 'transparent' }}
     >
       {!loading && logoUrl && !imgError ? (
         <img
           src={logoUrl}
           alt="Logo"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
+          style={{ background: 'transparent' }}
           onError={() => setImgError(true)}
         />
       ) : (

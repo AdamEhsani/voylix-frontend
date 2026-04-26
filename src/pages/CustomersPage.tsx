@@ -18,6 +18,7 @@ import {
 import { Link } from 'react-router-dom';
 import { cn} from '../utils';
 import { useNavigate } from "react-router-dom";
+import { toast } from 'sonner';
 
 interface APICustomer {
   id: number;
@@ -105,14 +106,47 @@ export function CustomersPage() {
         }
       );
 
+      // Body parse — backend mifreste { message, reason, invoiceCount? }
+      let body: any = null;
+      try { body = await response.json(); } catch { /* ignore */ }
+
+      if (response.status === 409) {
+        // In customer dare invoice/payment — ejaze nadarim pakesh konim
+        toast.error(
+          body?.message ||
+          "Dieser Kunde kann nicht gelöscht werden, da bereits Rechnungen oder Zahlungen existieren.",
+          {
+            position: "top-center",
+            duration: 6000
+          }
+        );
+        return;
+      }
+
+      if (response.status === 404) {
+        toast.error(body?.message || "Kunde wurde nicht gefunden.", {
+          position: "top-center"
+        });
+        return;
+      }
+
       if (!response.ok) {
-        throw new Error("Löschen fehlgeschlagen");
+        toast.error(body?.message || "Löschen fehlgeschlagen.", {
+          position: "top-center"
+        });
+        return;
       }
 
       setCustomers(prev => prev.filter(c => c.id !== customer.id));
+      toast.success(body?.message || "Kunde wurde erfolgreich gelöscht.", {
+        position: "top-center"
+      });
 
     } catch (err) {
       console.error(err);
+      toast.error("Netzwerkfehler beim Löschen des Kunden.", {
+        position: "top-center"
+      });
     }
   };
 

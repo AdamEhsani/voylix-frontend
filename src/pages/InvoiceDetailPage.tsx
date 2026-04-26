@@ -36,8 +36,9 @@ export function InvoiceDetailPage() {
       try {
         const token = localStorage.getItem("token");
 
+        // Endpoint jadid: az jadval Invoice + children mikhune.
         const res = await fetch(
-          `${API_URL}/api/uploadedFiles/${id}`,
+          `${API_URL}/api/invoices/${id}`,
           {
             headers: { Authorization: `Bearer ${token}` }
           }
@@ -45,39 +46,37 @@ export function InvoiceDetailPage() {
 
         if (!res.ok) throw new Error("Failed to fetch invoice data");
 
-        const file = await res.json();
-        
-        // Ensure the data structure matches TravelInvoice
-        const extractedData = typeof file.extractedJson === 'string' 
-          ? JSON.parse(file.extractedJson) 
-          : file.extractedJson || {};
-        
-        // Robust initialization of payments object
+        const invoice = (await res.json()) as TravelInvoice;
+
+        // Defaults baray field haei ke momkene null bashan
         const payments = {
-          invoice_total: extractedData.payments?.invoice_total || 0,
-          invoice_paid_amount: extractedData.payments?.invoice_paid_amount || 0,
-          invoice_balance: extractedData.payments?.invoice_balance || 0,
-          invoice_status: extractedData.payments?.invoice_status || "offen",
-          currency: extractedData.payments?.currency || "EUR",
-          payment_method: extractedData.payments?.payment_method || "Überweisung",
-          payment_date: extractedData.payments?.payment_date || null,
-          line_items: extractedData.payments?.line_items || [],
-          entries: extractedData.payments?.entries || []
+          invoice_total:        invoice.payments?.invoice_total        ?? 0,
+          invoice_paid_amount:  invoice.payments?.invoice_paid_amount  ?? 0,
+          invoice_balance:      invoice.payments?.invoice_balance      ?? 0,
+          invoice_status:       invoice.payments?.invoice_status       ?? "offen",
+          currency:             invoice.payments?.currency             ?? "EUR",
+          payment_method:       invoice.payments?.payment_method       ?? "Überweisung",
+          payment_date:         invoice.payments?.payment_date         ?? null,
+          line_items:           invoice.payments?.line_items           ?? [],
+          entries:              invoice.payments?.entries              ?? []
         };
-        // Robust initialization of customer object
+
         const customer = {
-          customerNumber: extractedData.customer?.customerNumber || "",
-          company_name: extractedData.customer?.company_name || file.customerName || "",
-          company_type: extractedData.customer?.company_type || "",
-          email: extractedData.customer?.email || file.customerEmail || file.email || "",
-          phone: extractedData.customer?.phone || file.customerPhone || file.phone || "",
-          address: extractedData.customer?.address || { street: "", PostalCode: "", city: "", country: "" }
+          customer_id:    invoice.customer?.customer_id    || null,
+          customerNumber: invoice.customer?.customerNumber || "",
+          customer_name:  invoice.customer?.customer_name  || "",
+          company_name:   invoice.customer?.company_name   || "",
+          company_type:   invoice.customer?.company_type   || "",
+          email:          invoice.customer?.email          || "",
+          phone:          invoice.customer?.phone          || "",
+          address:        invoice.customer?.address        || { street: "", postalCode: "", city: "", country: "" }
         };
+
         setData({
-          ...extractedData,
+          ...invoice,
           id: id,
-          customer: customer,
-          payments: payments
+          customer,
+          payments
         });
       } catch (error) {
         console.error("Error loading invoice:", error);
@@ -240,7 +239,7 @@ export function InvoiceDetailPage() {
           invoiceData={{
             id: id || '',
             number: data.invoice_meta?.invoice_number || '',
-            customerName: data.customer?.company_name || '',
+            customerName: data.customer?.company_name || data.customer?.customer_name || '',
             customerEmail: data.customer?.email || '',
             customerPhone: data.customer?.phone || '',
           }}
