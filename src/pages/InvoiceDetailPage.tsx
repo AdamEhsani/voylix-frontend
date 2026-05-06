@@ -4,7 +4,7 @@ import { InvoiceRenderer } from '../components/InvoiceRenderer';
 import { InvoicePreview } from '../components/InvoicePreview';
 import { ShareModal } from '../components/ShareModel';
 import { TravelInvoice, PaymentEntry, InvoiceDesignerSettings } from '../types';
-import { Printer, Download, ArrowLeft, Share2, CreditCard, Landmark, Banknote, Train, Check, AlertCircle, Loader2, Ban } from 'lucide-react';
+import { Printer, Download, ArrowLeft, Share2, CreditCard, Landmark, Banknote, Wallet, Check, AlertCircle, Loader2, Ban } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatCurrency, cn } from '../utils';
 import { generateInvoicePdf } from '../utils/pdfExport';
@@ -91,7 +91,7 @@ export function InvoiceDetailPage() {
   const paymentMethods = [
     { id: 'Überweisung', icon: Landmark, label: 'Überweisung' },
     { id: 'Kreditkarte', icon: CreditCard, label: 'Kreditkarte' },
-    { id: 'ICE Karte', icon: Train, label: 'ICE Karte' },
+    { id: 'EC Karte', icon: Wallet, label: 'EC Karte' },
     { id: 'Bar', icon: Banknote, label: 'Bar' },
   ];
 
@@ -256,7 +256,20 @@ export function InvoiceDetailPage() {
                         }
               });
               if (settingsRes.ok) {
-                settings = await settingsRes.json();
+                const raw = await settingsRes.json();
+                // Voylix: defaults baray-e notizen* agar tu JSON-e qadimi nabud.
+                settings = {
+                  ...raw,
+                  sectionVisibility: {
+                    ...(raw?.sectionVisibility ?? {}),
+                    notizen: raw?.sectionVisibility?.notizen ?? true,
+                  },
+                  notizenTitle:    raw?.notizenTitle    ?? 'Notizen',
+                  notizenText:     raw?.notizenText     ?? '',
+                  notizenAlign:    raw?.notizenAlign    ?? 'left',
+                  notizenFontSize: raw?.notizenFontSize ?? 9,
+                  notizenBold:     raw?.notizenBold     ?? false,
+                };
                 setPrintSettings(settings);
               }
             }

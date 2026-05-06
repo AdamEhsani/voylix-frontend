@@ -56,7 +56,13 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
   const dividerClass = showDividers ? 'border-b border-zinc-100' : '';
 
   const renderSection = (section: string) => {
-    if (!sectionVisibility[section]) return null;
+    // Voylix: notizen ye section-e jadid-e — JSON-e qadimi-ye agency in key ro nadarad.
+    // Pas defaultash visible-e va faghat agar explicit `false` bashe, hide misa.
+    if (section === 'notizen') {
+      if (sectionVisibility?.notizen === false) return null;
+    } else {
+      if (!sectionVisibility?.[section]) return null;
+    }
 
     switch (section) {
       case 'header':
@@ -320,9 +326,47 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
           </div>
         );
 
+      case 'notizen': {
+        const text  = (settings.notizenText ?? '').trim();
+        const title = (settings.notizenTitle ?? 'Notizen').trim();
+        if (text.length === 0) return null;
+        const align = settings.notizenAlign ?? 'left';
+        const sizePt = settings.notizenFontSize ?? 9;
+        const bold = settings.notizenBold === true;
+        return (
+          <div
+            key="notizen"
+            className={cn(
+              "mb-3 pt-3 border-t border-zinc-200",
+              align === 'left'   && "text-left",
+              align === 'center' && "text-center",
+              align === 'right'  && "text-right",
+            )}
+          >
+            {title && (
+              <p
+                className="font-bold uppercase tracking-wide text-zinc-700 mb-1"
+                style={{ fontSize: `${Math.max(sizePt, 8)}pt` }}
+              >
+                {title}
+              </p>
+            )}
+            <p
+              className={cn(
+                "leading-snug text-zinc-800 whitespace-pre-wrap",
+                bold && "font-bold"
+              )}
+              style={{ fontSize: `${sizePt}pt` }}
+            >
+              {text}
+            </p>
+          </div>
+        );
+      }
+
       case 'footer':
         return (
-          <div key="footer" className="mt-auto pt-4 border-t border-zinc-100">
+          <div key="footer" className="pt-4 border-t border-zinc-100">
             <div className="grid grid-cols-3 gap-8 text-[8px] text-zinc-400 leading-normal">
               <div>
                 <p className="font-bold text-zinc-900 uppercase mb-1">Zahlungsinformationen</p>
@@ -389,7 +433,22 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
       )}
 
       <div className="p-6 flex flex-col min-h-[275mm]">
-        {sectionOrdering.map(section => renderSection(section))}
+        {/*
+          Voylix: 'notizen' va 'footer' hamishe ba ham, daghihan ta-ye safhe chap mishan.
+          Notizen daghighan bala-ye Footer mishine. ja-ye notizen tu sectionOrdering nadiide gerefte mishe.
+        */}
+        {(() => {
+          const ordered = sectionOrdering.filter(s => s !== 'notizen' && s !== 'footer');
+          return (
+            <>
+              {ordered.map(section => renderSection(section))}
+              <div className="mt-auto">
+                {renderSection('notizen')}
+                {renderSection('footer')}
+              </div>
+            </>
+          );
+        })()}
       </div>
     </div>
   );

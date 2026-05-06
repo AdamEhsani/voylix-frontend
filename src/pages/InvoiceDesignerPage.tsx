@@ -38,7 +38,7 @@ const DEFAULT_SETTINGS: InvoiceDesignerSettings = {
   showIataLogo: false,
   companyBlockPosition: 'right',
   customerBlockPosition: 'left',
-  sectionOrdering: ['header', 'customer', 'passengers', 'flight', 'hotel', 'package', 'payments', 'footer'],
+  sectionOrdering: ['header', 'customer', 'passengers', 'flight', 'hotel', 'package', 'payments', 'notizen', 'footer'],
   sectionVisibility: {
     header: true,
     customer: true,
@@ -47,6 +47,7 @@ const DEFAULT_SETTINGS: InvoiceDesignerSettings = {
     hotel: true,
     package: true,
     payments: true,
+    notizen: true,
     footer: true
   },
   titleCustomization: 'RECHNUNG',
@@ -55,7 +56,12 @@ const DEFAULT_SETTINGS: InvoiceDesignerSettings = {
   showBorders: false,
   showDividers: true,
   primaryColor: '#10b981',
-  fontSize: 12
+  fontSize: 12,
+  notizenTitle: 'Notizen',
+  notizenText: '',
+  notizenAlign: 'left',
+  notizenFontSize: 9,
+  notizenBold: false,
 };
 
 const MOCK_INVOICE: TravelInvoice = {
@@ -64,6 +70,7 @@ const MOCK_INVOICE: TravelInvoice = {
     invoice_id: 'R-2024-001',
     invoice_number: 'RE-2024-001',
     invoice_date: '27.03.2024',
+    buchungsnummer: 'BKG-77721',
     booking_reference: 'ABC123XYZ',
     va_reference: 'VA-999',
     language: 'de'
@@ -177,6 +184,23 @@ export function InvoiceDesignerPage() {
   const [saving, setSaving] = useState(false);
   const [agencyLogoPath, setAgencyLogoPath] = useState<string | null>(null);
 
+  // Voylix: merge-e amn ba DEFAULT_SETTINGS — agar JSON-e qadimi-ye agency
+  // notizen* ya sectionVisibility.notizen nadasht, default mishe tajaroti.
+  const mergeWithDefaults = (data: Partial<InvoiceDesignerSettings> | null | undefined): InvoiceDesignerSettings => {
+    if (!data) return DEFAULT_SETTINGS;
+    return {
+      ...DEFAULT_SETTINGS,
+      ...data,
+      sectionOrdering: (data.sectionOrdering && data.sectionOrdering.length > 0)
+        ? (data.sectionOrdering.includes('notizen') ? data.sectionOrdering : [...data.sectionOrdering, 'notizen'])
+        : DEFAULT_SETTINGS.sectionOrdering,
+      sectionVisibility: {
+        ...DEFAULT_SETTINGS.sectionVisibility,
+        ...(data.sectionVisibility ?? {}),
+      },
+    };
+  };
+
   // Initial Load
   useEffect(() => {
     const loadSettings = async () => {
@@ -191,16 +215,16 @@ export function InvoiceDesignerPage() {
         });
         if (response.ok) {
           const data = await response.json();
-          if (data) setSettings(data);
+          setSettings(mergeWithDefaults(data));
         } else {
           // Fallback to localStorage
           const saved = localStorage.getItem('invoice_designer_settings');
-          if (saved) setSettings(JSON.parse(saved));
+          setSettings(mergeWithDefaults(saved ? JSON.parse(saved) : null));
         }
       } catch (error) {
         console.error('Failed to load settings from DB:', error);
         const saved = localStorage.getItem('invoice_designer_settings');
-        if (saved) setSettings(JSON.parse(saved));
+        setSettings(mergeWithDefaults(saved ? JSON.parse(saved) : null));
       } finally {
         setLoading(false);
       }
@@ -519,13 +543,109 @@ export function InvoiceDesignerPage() {
                 <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
                   <TypeIcon size={14} /> Invoice Title
                 </label>
-                <input 
+                <input
                   type="text"
                   value={settings.titleCustomization}
                   onChange={(e) => updateSettings({ titleCustomization: e.target.value })}
                   className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                   placeholder="e.g. REISE-RECHNUNG"
                 />
+              </div>
+
+              {/* Notizen (Agentur Custom Text) */}
+              <div className="space-y-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/40 dark:bg-zinc-800/20">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                    <TypeIcon size={14} /> Notizen (Agentur)
+                  </label>
+                  <button
+                    onClick={() => toggleVisibility('notizen')}
+                    className={cn(
+                      "p-1 rounded-md transition-colors",
+                      settings.sectionVisibility.notizen
+                        ? "text-emerald-600 hover:bg-emerald-100 dark:hover:bg-emerald-900/20"
+                        : "text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                    )}
+                    title={settings.sectionVisibility.notizen ? "Sichtbar im Druck — klicken um auszublenden" : "Nicht im Druck — klicken um einzublenden"}
+                  >
+                    <Eye size={14} className={settings.sectionVisibility.notizen ? '' : 'opacity-30'} />
+                  </button>
+                </div>
+                <p className="text-[10px] text-zinc-500 leading-relaxed">
+                  Dieser Text erscheint auf jeder gedruckten Rechnung direkt vor dem Footer. Mehrzeilig — Zeilenumbrüche bleiben erhalten.
+                </p>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-tight">Überschrift</label>
+                  <input
+                    type="text"
+                    value={settings.notizenTitle ?? ''}
+                    onChange={(e) => updateSettings({ notizenTitle: e.target.value })}
+                    placeholder="Notizen"
+                    className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-tight">Text</label>
+                  <textarea
+                    value={settings.notizenText ?? ''}
+                    onChange={(e) => updateSettings({ notizenText: e.target.value })}
+                    rows={6}
+                    placeholder={"z.B.\nVielen Dank für Ihre Buchung.\nWir wünschen Ihnen eine gute Reise.\n\nIhre Reiseagentur"}
+                    className="w-full px-3 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs leading-relaxed outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all resize-y font-mono"
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-zinc-400 uppercase">Ausrichtung</label>
+                    <div className="flex gap-1">
+                      {(['left', 'center', 'right'] as const).map(a => (
+                        <button
+                          key={a}
+                          onClick={() => updateSettings({ notizenAlign: a })}
+                          className={cn(
+                            "flex-1 p-1.5 rounded-md border text-xs transition-all",
+                            settings.notizenAlign === a
+                              ? "bg-emerald-50 border-emerald-300 text-emerald-600 dark:bg-emerald-900/20 dark:border-emerald-800"
+                              : "bg-white border-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:border-zinc-700"
+                          )}
+                        >
+                          {a === 'left' && <AlignLeft size={12} className="mx-auto" />}
+                          {a === 'center' && <AlignCenter size={12} className="mx-auto" />}
+                          {a === 'right' && <AlignRight size={12} className="mx-auto" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-zinc-400 uppercase">Größe (pt)</label>
+                    <input
+                      type="number"
+                      min={6}
+                      max={16}
+                      step={0.5}
+                      value={settings.notizenFontSize ?? 9}
+                      onChange={(e) => updateSettings({ notizenFontSize: parseFloat(e.target.value) || 9 })}
+                      className="w-full px-2 py-1.5 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-bold text-zinc-400 uppercase">Fett</label>
+                    <button
+                      onClick={() => updateSettings({ notizenBold: !settings.notizenBold })}
+                      className={cn(
+                        "w-full p-1.5 rounded-md border text-xs font-bold transition-all",
+                        settings.notizenBold
+                          ? "bg-emerald-50 border-emerald-300 text-emerald-600 dark:bg-emerald-900/20 dark:border-emerald-800"
+                          : "bg-white border-zinc-200 text-zinc-500 dark:bg-zinc-800 dark:border-zinc-700"
+                      )}
+                    >
+                      B
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Section Visibility */}
@@ -538,8 +658,8 @@ export function InvoiceDesignerPage() {
                       onClick={() => toggleVisibility(section)}
                       className={cn(
                         "w-full flex items-center justify-between p-2 rounded-lg text-xs transition-all",
-                        visible 
-                          ? "bg-emerald-50/50 text-emerald-700 dark:bg-emerald-900/10 dark:text-emerald-400" 
+                        visible
+                          ? "bg-emerald-50/50 text-emerald-700 dark:bg-emerald-900/10 dark:text-emerald-400"
                           : "bg-zinc-50 text-zinc-400 dark:bg-zinc-800/30"
                       )}
                     >

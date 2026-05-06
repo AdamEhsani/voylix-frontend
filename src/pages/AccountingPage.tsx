@@ -85,7 +85,7 @@ export function AccountingPage() {
         const allowedMethod =
           normalized.includes("bar") ||
           normalized.includes("kreditkarte") ||
-          normalized.includes("ice karte") ||
+          normalized.includes("ec karte") ||
           normalized.includes("überweisung")
             ? rawMethod
             : rawMethod || "-";
@@ -195,10 +195,12 @@ export function AccountingPage() {
 
   const getMethodIcon = (method: string) => {
     if (!method) return null;
-    
+
     const m = method.toLowerCase();
     if (m.includes('bar')) return <Banknote size={14} />;
-    if (m.includes('karte') || m.includes('credit')) return <CreditCard size={14} />;
+    if (m.includes('ec ') || m === 'ec' || m.startsWith('ec-')) return <Wallet size={14} />;
+    if (m.includes('credit') || m.includes('kredit')) return <CreditCard size={14} />;
+    if (m.includes('karte')) return <Wallet size={14} />;
     if (m.includes('überweisung')) return <ArrowUpRight size={14} />;
     return <Wallet size={14} />;
   };
@@ -311,7 +313,7 @@ export function AccountingPage() {
               <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider">
                 <th className="px-6 py-4">Kunde</th>
                 <th className="px-6 py-4">Rechnung</th>
-                <th className="px-6 py-4">Datum</th>
+                <th className="px-6 py-4"> Zahlungsdatum</th>
                 <th className="px-6 py-4">Rg.-Summe</th>
                 <th className="px-6 py-4">Diese Zahlung</th>
                 <th className="px-6 py-4">Restbetrag</th>
@@ -360,7 +362,13 @@ export function AccountingPage() {
                       <span className="text-sm font-bold text-zinc-900 dark:text-white">{entry.customerName}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-zinc-500">{entry.invoiceId}</span>
+                      <Link
+                        to={`/invoices/${entry.invoiceId}`}
+                        className="text-sm font-bold text-emerald-600 hover:text-emerald-700 hover:underline transition-colors"
+                        title="Rechnung ansehen"
+                      >
+                        R-{entry.invoiceId}
+                      </Link>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-zinc-500">{entry.date}</span>

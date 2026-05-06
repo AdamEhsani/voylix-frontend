@@ -12,6 +12,7 @@ export function CreateHotelInvoicePage() {
       invoice_number: `RE-H-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       invoice_id: `R-H-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       invoice_date: new Date().toISOString().slice(0, 10),
+      buchungsnummer: "",
       booking_reference: "",
       va_reference: "",
       language: "de"

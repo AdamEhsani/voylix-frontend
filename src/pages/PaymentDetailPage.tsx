@@ -7,7 +7,7 @@ import {
   Landmark,
   Check,
   AlertCircle,
-  Train
+  Wallet
 } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
 import { API_URL } from "../config/api";
@@ -43,12 +43,13 @@ export function PaymentDetailPage() {
   const [paymentDate, setPaymentDate] = useState<string>(
     new Date().toISOString().slice(0, 10) // default emrooz
   );
+  const [note, setNote]               = useState<string>('');
   const [isSaving, setIsSaving]       = useState(false);
 
   const paymentMethods = [
     { id: 'Überweisung', icon: Landmark,  label: 'Überweisung' },
     { id: 'Kreditkarte', icon: CreditCard, label: 'Kreditkarte' },
-    { id: 'ICE Karte',   icon: Train,      label: 'ICE Karte'   },
+    { id: 'EC Karte',    icon: Wallet,     label: 'EC Karte'    },
     { id: 'Bar',         icon: Banknote,   label: 'Bar'         },
   ];
 
@@ -114,6 +115,7 @@ export function PaymentDetailPage() {
           amount: amt,
           method: method,
           date:   paymentDate,    // ISO yyyy-MM-dd
+          note:   note.trim() || null,
         }),
       });
 
@@ -263,6 +265,18 @@ export function PaymentDetailPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Notiz */}
+          <div className="space-y-3">
+            <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Notiz (optional)</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="z.B. Kunde ist mit Restbetrag im Verzug, Zahlungsabsprache, Sonderkonditionen ..."
+              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all resize-y"
+            />
           </div>
 
           {/* Info Box */}

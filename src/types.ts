@@ -91,6 +91,7 @@ export interface InvoiceMeta {
   invoice_number: string;
   invoice_id: string;
   invoice_date: string;
+  buchungsnummer: string;
   booking_reference: string;
   va_reference: string;
   language: string;
@@ -205,12 +206,21 @@ export interface TravelInvoice {
     tax_change_notice: string;
     usa_esta_notice: string;
   };
+  notizen?: InvoiceNote[];
   system_meta: {
     source_type: string; // "pdf | image"
     extraction_model: string;
     extracted_at: string;
   };
    show_iata_logo?: boolean;
+}
+
+export interface InvoiceNote {
+  id?: number;
+  orderIndex: number;
+  text: string;
+  includeInPrint: boolean;
+  isProtected?: boolean;
 }
 
 export interface BackendCustomer {
@@ -272,6 +282,12 @@ export interface InvoiceDesignerSettings {
   showDividers: boolean;
   primaryColor: string;
   fontSize: number;
+  // Voylix: Notiz-e-Agentur (per-agency, daghihan bala-ye Footer chap mishe).
+  notizenTitle?: string;
+  notizenText?: string;
+  notizenAlign?: 'left' | 'center' | 'right';
+  notizenFontSize?: number;
+  notizenBold?: boolean;
 }
 
 export interface AuthResponse {

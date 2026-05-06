@@ -7,7 +7,7 @@ import {
   Landmark,
   Check,
   AlertCircle,
-  Train,
+  Wallet,
   Trash2
 } from 'lucide-react';
 import { formatCurrency, cn } from '../utils';
@@ -24,6 +24,7 @@ interface PaymentEdit {
   amount: number;
   method: string;
   paymentDate: string;        // yyyy-MM-dd
+  note: string | null;
   createdAt: string;
   invoiceTotal: number;
   invoicePaidAmount: number;
@@ -44,6 +45,7 @@ export function PaymentEditPage() {
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<string>('Überweisung');
   const [paymentDate, setPaymentDate] = useState<string>('');
+  const [note, setNote] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -51,7 +53,7 @@ export function PaymentEditPage() {
   const paymentMethods = [
     { id: 'Überweisung', icon: Landmark,   label: 'Überweisung' },
     { id: 'Kreditkarte', icon: CreditCard, label: 'Kreditkarte' },
-    { id: 'ICE Karte',   icon: Train,      label: 'ICE Karte'   },
+    { id: 'EC Karte',    icon: Wallet,     label: 'EC Karte'    },
     { id: 'Bar',         icon: Banknote,   label: 'Bar'         },
   ];
 
@@ -80,6 +82,7 @@ export function PaymentEditPage() {
         setAmount(String(data.amount ?? ''));
         setMethod(data.method || 'Überweisung');
         setPaymentDate(data.paymentDate || new Date().toISOString().slice(0, 10));
+        setNote(data.note ?? '');
       } catch (err: any) {
         setError(err.message ?? 'Fehler beim Laden');
       } finally {
@@ -117,6 +120,7 @@ export function PaymentEditPage() {
           amount: amt,
           method: method,
           date:   paymentDate,
+          note:   note.trim() || null,
         }),
       });
 
@@ -308,6 +312,18 @@ export function PaymentEditPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Notiz */}
+          <div className="space-y-3">
+            <label className="text-sm font-bold text-zinc-500 uppercase tracking-wider">Notiz (optional)</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="z.B. Kunde ist mit Restbetrag im Verzug, Zahlungsabsprache, Sonderkonditionen ..."
+              className="w-full px-4 py-3 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all resize-y"
+            />
           </div>
 
           {/* Info Box */}

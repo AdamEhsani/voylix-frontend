@@ -12,6 +12,7 @@ export function CreateFlightInvoicePage() {
       invoice_number: `RE-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       invoice_id: `R-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       invoice_date: new Date().toISOString().slice(0, 10),
+      buchungsnummer: "",
       booking_reference: "",
       va_reference: "",
       language: "de"

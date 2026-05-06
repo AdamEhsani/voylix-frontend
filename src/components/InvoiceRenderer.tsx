@@ -22,7 +22,8 @@ import {
   Truck,
   Ban,
   Calculator,
-  Edit2
+  Edit2,
+  Hash
 } from 'lucide-react'
 import React, { useState, useEffect } from 'react'
 import { toast } from 'sonner'
@@ -70,6 +71,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
     invoice_number: '',
     invoice_id: '',
     invoice_date: '',
+    buchungsnummer: '',
     booking_reference: '',
     va_reference: '',
     language: 'de'
@@ -344,6 +346,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
           invoice_number: '',
           invoice_id: '',
           invoice_date: '',
+          buchungsnummer: '',
           booking_reference: '',
           va_reference: '',
           language: 'de',
@@ -367,6 +370,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       invoice_meta: { ...invoiceMeta, [field]: value }
     })
   }
+
 
   const updateCustomer = (field: string, value: any) => {
     onUpdate({
@@ -670,7 +674,21 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
       if (response.ok) {
         const settings = await response.json();
-        setPrintSettings(settings);
+        // Voylix: agar JSON-e qadimi-ye agency notizen-related field-ha ya visibility-ye notizen
+        // ro nadarad, defaultash mishe ke notizen tu print zaher mishe.
+        const merged: InvoiceDesignerSettings = {
+          ...settings,
+          sectionVisibility: {
+            ...(settings?.sectionVisibility ?? {}),
+            notizen: settings?.sectionVisibility?.notizen ?? true,
+          },
+          notizenTitle:    settings?.notizenTitle    ?? 'Notizen',
+          notizenText:     settings?.notizenText     ?? '',
+          notizenAlign:    settings?.notizenAlign    ?? 'left',
+          notizenFontSize: settings?.notizenFontSize ?? 9,
+          notizenBold:     settings?.notizenBold     ?? false,
+        };
+        setPrintSettings(merged);
         setIsPrinting(true);
       } else {
         window.print();
@@ -1107,6 +1125,22 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
           )}
         </div>
 
+        {/* BUCHUNGSNUMMER */}
+        <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+            <Hash size={14} /> Buchungsnummer
+          </h3>
+          <div className="max-w-md">
+            <label className="text-[9px] font-bold text-zinc-400 uppercase">Buchungsnummer</label>
+            <input
+              value={invoiceMeta.buchungsnummer ?? ''}
+              onChange={e => updateInvoiceMeta('buchungsnummer', e.target.value)}
+              className="w-full px-3 py-1.5 mt-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+              placeholder="z.B. ABC123 / XK7P9Q"
+            />
+          </div>
+        </div>
+
         {/* FLIGHT DETAILS */}
         {(invoiceMeta.invoice_type === 'Flug' || invoiceMeta.invoice_type === 'Package') && (
           <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-800/10 space-y-6">
@@ -1151,8 +1185,9 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                           <label className="text-[9px] font-bold text-zinc-400 uppercase">Flugnummer</label>
                           <input
                             value={s.flight_number ?? ''}
-                            onChange={e => updateFlightSegment('segmentsTo', i, 'flight_number', e.target.value)}
-                            className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                            onChange={e => updateFlightSegment('segmentsTo', i, 'flight_number', e.target.value.toUpperCase())}
+                            className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500 uppercase"
+                            style={{ textTransform: 'uppercase' }}
                             placeholder="LH123"
                           />
                         </div>
@@ -1233,8 +1268,9 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                           <label className="text-[9px] font-bold text-zinc-400 uppercase">Flugnummer</label>
                           <input
                             value={s.flight_number ?? ''}
-                            onChange={e => updateFlightSegment('segmentsBack', i, 'flight_number', e.target.value)}
-                            className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500"
+                            onChange={e => updateFlightSegment('segmentsBack', i, 'flight_number', e.target.value.toUpperCase())}
+                            className="w-full px-2 py-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded text-xs outline-none focus:ring-1 focus:ring-emerald-500 uppercase"
+                            style={{ textTransform: 'uppercase' }}
                             placeholder="LH123"
                           />
                         </div>

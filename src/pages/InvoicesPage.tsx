@@ -29,7 +29,8 @@ interface Invoice {
   id: number;
   number: string;
   customer: string;
-  date: string;
+  date: string;            // Rechnungsdatum
+  abreiseDate: string;     // Abreise / Check-in
   amount: number;
   status: string;
   type: string;
@@ -71,20 +72,34 @@ export function InvoicesPage() {
 
       const data: any[] = await res.json();
 
-      const mapped: Invoice[] = data.map((row) => ({
-        id: row.id,
-        number: `R-${row.id}`,
-        customer: row.customer ?? "Unknown",
-        date: row.date ?? "",
-        amount: typeof row.amount === "number" ? row.amount : Number(row.amount ?? 0),
-        status: row.status ?? "offen",
-        type: row.type ?? "Flug",
-        destination: row.destination ?? "",
-        departureTime: row.departureTime ?? null,
-        user: row.user ?? "Unbekannt",
-        userType: row.userType ?? "Unbekannt",
-        passengers: Array.isArray(row.passengers) ? row.passengers : []
-      }));
+      // Voylix: agar abreiseDate khali bud, az departureTime ISO ham ye fallback dorost-paziri mikonim.
+      const isoToDe = (iso?: string | null): string => {
+        if (!iso) return "";
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return "";
+        return d.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+      };
+
+      const mapped: Invoice[] = data.map((row) => {
+        const abreiseFromBackend =
+          row.abreiseDate ?? row.AbreiseDate ?? row.abreise_date ?? "";
+        const abreiseFallback = abreiseFromBackend || isoToDe(row.departureTime);
+        return {
+          id: row.id,
+          number: `R-${row.id}`,
+          customer: row.customer ?? "Unknown",
+          date: row.date ?? "",
+          abreiseDate: abreiseFallback,
+          amount: typeof row.amount === "number" ? row.amount : Number(row.amount ?? 0),
+          status: row.status ?? "offen",
+          type: row.type ?? "Flug",
+          destination: row.destination ?? "",
+          departureTime: row.departureTime ?? null,
+          user: row.user ?? "Unbekannt",
+          userType: row.userType ?? "Unbekannt",
+          passengers: Array.isArray(row.passengers) ? row.passengers : []
+        };
+      });
 
       setInvoices(mapped);
     } catch (err: any) {
@@ -170,7 +185,8 @@ export function InvoicesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    // Voylix: neg-margin baray escape kardan az max-w-7xl-e DashboardLayout — jadval ja-tar mishe va niaze be scroll kam mishe.
+    <div className="space-y-6 xl:-mx-8 2xl:-mx-16">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Rechnungen</h1>
@@ -285,22 +301,24 @@ export function InvoicesPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-xs font-bold uppercase tracking-wider">
-                <th className="px-2 py-2">Rechnungsnummer</th>
-                <th className="px-6 py-4">Typ</th>
-                <th className="px-6 py-4">Kunde</th>
-                <th className="px-6 py-4">Abreise Datum</th>
-                <th className="px-6 py-4">Reiseziel</th>
-                <th className="px-6 py-4">Betrag</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Aktionen</th>
-                <th className="px-6 py-4 text-right">User</th>
+              <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-[11px] font-bold uppercase tracking-wider">
+                <th className="px-3 py-3">Rechnungsnr.</th>
+                <th className="px-2 py-3">Typ</th>
+                <th className="px-3 py-3">Kunde</th>
+                <th className="px-2 py-3 text-center">Reiseteilnehmer</th>
+                <th className="px-3 py-3">Rechnungsdatum</th>
+                <th className="px-3 py-3">Abreise Datum</th>
+                <th className="px-3 py-3">Reiseziel</th>
+                <th className="px-3 py-3">Betrag</th>
+                <th className="px-3 py-3">Status</th>
+                <th className="px-2 py-3 text-right">Aktionen</th>
+                <th className="px-3 py-3 text-right">User</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={11} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
                       <p className="text-sm text-zinc-500">Rechnungen werden geladen...</p>
@@ -309,7 +327,7 @@ export function InvoicesPage() {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={11} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <AlertCircle className="w-8 h-8 text-red-500" />
                       <p className="text-sm text-red-500 font-medium">{error}</p>
@@ -324,7 +342,7 @@ export function InvoicesPage() {
                 </tr>
               ) : currentInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={11} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <FileText className="w-8 h-8 text-zinc-300" />
                       <p className="text-sm text-zinc-500">Keine Rechnungen gefunden.</p>
@@ -334,55 +352,58 @@ export function InvoicesPage() {
               ) : (
                 currentInvoices.map((inv) => (
                   <tr key={inv.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600">
-                          <FileText size={16} />
-                        </div>
-                        <span className="text-sm font-bold text-zinc-900 dark:text-white">{"R-" + inv.id}</span>
-                      </div>
+                    <td className="px-3 py-3">
+                      <span className="text-xs font-bold text-zinc-900 dark:text-white">{"R-" + inv.id}</span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-2 py-3">
                       <div className={cn(
-                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider",
+                        "inline-flex items-center justify-center w-7 h-7 rounded-lg",
                         getTypeStyles(inv.type)
                       )}>
                         {getTypeIcon(inv.type)}
-                        {inv.type}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="relative inline-flex items-center gap-1 group">
-                        <span className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {inv.customer}
+                    <td className="px-3 py-3">
+                      <span className="text-xs text-zinc-600 dark:text-zinc-400 whitespace-nowrap">
+                        {inv.customer}
+                      </span>
+                    </td>
+                    <td className="px-2 py-3 text-center">
+                      <div className="relative inline-flex items-center justify-center group/pax">
+                        <span className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full text-[11px] font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300">
+                          {inv.passengers?.length ?? 0}
                         </span>
-                        {/* tooltip */}
-                        <div className="absolute bottom-full mb-2 left-0 hidden group-hover:block z-50 w-48 rounded-md bg-zinc-900 text-white shadow-lg p-2 text-xs">
-                          {inv.passengers?.map((p: any, i: number) => (
-                            <div key={i}>{p.fullName.toLowerCase()}</div>
-                          ))}
-                        </div>
+                        {(inv.passengers?.length ?? 0) > 0 && (
+                          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover/pax:block z-50 w-56 rounded-md bg-zinc-900 text-white shadow-lg p-2 text-xs space-y-0.5">
+                            {inv.passengers!.map((p: any, i: number) => (
+                              <div key={i}>{(i + 1) + '. ' + (p.fullName ?? '').toLowerCase()}</div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-zinc-500">{inv.date}</span>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <span className="text-xs text-zinc-500">{inv.date}</span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-zinc-500">{inv.destination}</span>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <span className="text-xs text-zinc-500">{inv.abreiseDate || '—'}</span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-zinc-500">
+                    <td className="px-3 py-3">
+                      <span className="text-xs text-zinc-500">{inv.destination}</span>
+                    </td>
+                    <td className="px-3 py-3 whitespace-nowrap">
+                      <span className="text-xs text-zinc-500">
                         {new Intl.NumberFormat("de-DE", {
                           style: "currency",
                           currency: "EUR",
                         }).format(inv.amount)}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3">
                       <Link
                         to={inv.userType === "admin" ? `/payment/${inv.id}` : "#"}
                         className={cn(
-                          "inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer",
+                          "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer whitespace-nowrap",
                           inv.status.toLowerCase() === 'bezahlt' ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" :
                             inv.status.toLowerCase() === 'offen' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" :
                               "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
@@ -391,19 +412,17 @@ export function InvoicesPage() {
                         {inv.status}
                       </Link>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Link
-                          to={`/invoices/${inv.id}`}
-                          className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
-                          title="Ansehen"
-                        >
-                          <Eye size={18} />
-                        </Link>
-                      </div>
+                    <td className="px-2 py-3 text-right">
+                      <Link
+                        to={`/invoices/${inv.id}`}
+                        className="inline-flex p-1.5 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors"
+                        title="Ansehen"
+                      >
+                        <Eye size={16} />
+                      </Link>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-sm text-zinc-500">{inv.user}</span>
+                    <td className="px-3 py-3 text-right whitespace-nowrap">
+                      <span className="text-xs text-zinc-500">{inv.user}</span>
                     </td>
                   </tr>
                 ))
