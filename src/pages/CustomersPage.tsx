@@ -19,6 +19,7 @@ import { Link } from 'react-router-dom';
 import { cn} from '../utils';
 import { useNavigate } from "react-router-dom";
 import { toast } from 'sonner';
+import { KNOWN_TITLES, parseTitleAndName, joinTitleAndName } from '../utils/customerTitle';
 
 interface APICustomer {
   id: number;
@@ -58,6 +59,8 @@ export function CustomersPage() {
   const [paymentMethod, setPaymentMethod] = useState<string>('Bar');
   const [editingCustomer, setEditingCustomer] = useState<APICustomer | null>(null);
   const [editType, setEditType] = useState<'person' | 'company'>('person');
+  // Voylix: title (Anrede) — bedoone migration tu FirstName store mishe.
+  const [editTitle, setEditTitle] = useState<string>('');
   const [sortConfig, setSortConfig] = useState<{ key: keyof APICustomer; direction: 'asc' | 'desc' } | null>(null);
   const [customers, setCustomers] = useState<APICustomer[]>([]);
   const token = localStorage.getItem("token");
@@ -151,7 +154,10 @@ export function CustomersPage() {
   };
 
   const startEditing = (customer: APICustomer) => {
-    setEditingCustomer(customer);
+    // Voylix: title-e prefix shode tu FirstName ro joda kon
+    const { title, firstName: cleanFirst } = parseTitleAndName(customer.firstName);
+    setEditTitle(title);
+    setEditingCustomer({ ...customer, firstName: cleanFirst });
     // Detect type based on company name
     if (customer.company?.name) {
       setEditType('company');
@@ -174,7 +180,7 @@ export function CustomersPage() {
           },
           body: JSON.stringify({
             Id: editingCustomer.id,
-            FirstName: editingCustomer.firstName,
+            FirstName: joinTitleAndName(editTitle, editingCustomer.firstName),
             LastName: editingCustomer.lastName,
             DateOfBirth: editingCustomer.dateOfBirth,
             Nationality: editingCustomer.nationality,
@@ -449,6 +455,22 @@ export function CustomersPage() {
                         <Edit2 size={14} /> Persönliche Informationen
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-1.5 md:col-span-2">
+                          <label className="text-[10px] font-bold text-zinc-500 uppercase">Anrede / Titel (optional)</label>
+                          <select
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                          >
+                            <option value="">— ohne —</option>
+                            {KNOWN_TITLES.map(t => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                          </select>
+                          <p className="text-[10px] text-zinc-400">
+                            Wird vor dem Vornamen gespeichert (z.B. „Dr. Max"). Erscheint überall, wo der Kundenname angezeigt wird.
+                          </p>
+                        </div>
                         <div className="space-y-1.5">
                           <label className="text-[10px] font-bold text-zinc-500 uppercase">Vorname</label>
                           <input

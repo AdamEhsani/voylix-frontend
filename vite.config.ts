@@ -6,7 +6,9 @@ import {defineConfig, loadEnv} from 'vite';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
-    base: './',
+    // Voylix: app under voylix.de/app subpath. Vase prod build base='/app/'.
+    // Tu dev (mode=development) az '/' estefade mishe ke vite dev server raahat kar kone.
+    base: mode === 'production' ? '/app/' : '/',
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),

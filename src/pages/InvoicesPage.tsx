@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Search,
   Filter,
@@ -15,9 +15,12 @@ import {
   Briefcase,
   Loader2,
   AlertCircle,
-  X
+  X,
+  Combine,
+  Check
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { formatCurrency, cn, formatDate } from '../utils';
 import { API_URL } from "../config/api";
 interface InvoicePassenger {
@@ -27,7 +30,7 @@ interface InvoicePassenger {
 
 interface Invoice {
   id: number;
-  number: string;
+  number: string;          // Rechnungsnummer (Backend liefert "RE-NNNNN")
   customer: string;
   date: string;            // Rechnungsdatum
   abreiseDate: string;     // Abreise / Check-in
@@ -42,6 +45,7 @@ interface Invoice {
 }
 
 export function InvoicesPage() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +54,12 @@ export function InvoicesPage() {
   const [itemsPerPage] = useState(10);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // Voylix: Multi-select baray Zusammenführen
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [showMerged, setShowMerged] = useState(false); // namayesh-e Rechnung-haye zusammengeführt
+  const [isMerging, setIsMerging] = useState(false);
+  const [showMergeConfirm, setShowMergeConfirm] = useState(false);
   
   const loadInvoices = async () => {
     try {
@@ -84,9 +94,13 @@ export function InvoicesPage() {
         const abreiseFromBackend =
           row.abreiseDate ?? row.AbreiseDate ?? row.abreise_date ?? "";
         const abreiseFallback = abreiseFromBackend || isoToDe(row.departureTime);
+        // Voylix: Rechnungsnummer az backend miad (RE-NNNNN — per-agency lückenlos).
+        // Fallback baray-e qadimi-ye `R-${id}` ha hanouz hifz mishe age field nayad.
+        const rechnungsNummer =
+          row.rechnungsNummer ?? row.RechnungsNummer ?? `R-${row.id}`;
         return {
           id: row.id,
-          number: `R-${row.id}`,
+          number: rechnungsNummer,
           customer: row.customer ?? "Unknown",
           date: row.date ?? "",
           abreiseDate: abreiseFallback,
@@ -115,12 +129,15 @@ export function InvoicesPage() {
   }, []);
 
   const filteredInvoices = invoices.filter(inv => {
-    const matchesSearch = 
+    // Voylix: zusammengeführte Rechnungen ro be tor pishfarz makhfi mikonim
+    if (!showMerged && (inv.status ?? '').toLowerCase() === 'zusammengeführt') return false;
+
+    const matchesSearch =
       inv.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       inv.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
       inv.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
       inv.status.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     if (!matchesSearch) return false;
 
     if (startDate || endDate) {
@@ -172,7 +189,8 @@ export function InvoicesPage() {
     const normalizedType = type.toLowerCase();
     if (normalizedType.includes('flug')) return <Plane size={14} />;
     if (normalizedType.includes('hotel')) return <Landmark size={14} />;
-    if (normalizedType.includes('pauschal')) return <Briefcase size={14} />;
+    // Voylix: Pauschal canonical, "package" legacy alias
+    if (normalizedType.includes('pauschal') || normalizedType.includes('package')) return <Briefcase size={14} />;
     return <FileText size={14} />;
   };
 
@@ -180,8 +198,102 @@ export function InvoicesPage() {
     const normalizedType = type.toLowerCase();
     if (normalizedType.includes('flug')) return "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400";
     if (normalizedType.includes('hotel')) return "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400";
-    if (normalizedType.includes('package')) return "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400";
+    if (normalizedType.includes('pauschal') || normalizedType.includes('package')) return "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400";
     return "bg-zinc-50 dark:bg-zinc-900/20 text-zinc-600 dark:text-zinc-400";
+  };
+
+  // -------- Multi-select / Zusammenführen helpers --------
+  const isMergeBlocked = (status: string) => {
+    const s = (status ?? '').toLowerCase();
+    return s === 'storniert' || s === 'zusammengeführt';
+  };
+
+  const toggleSelected = (id: number, status: string) => {
+    if (isMergeBlocked(status)) return;
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Selectable invoices on the CURRENT page (not blocked by status)
+  const selectableOnPage = useMemo(
+    () => filteredInvoices
+      .slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+      .filter(i => !isMergeBlocked(i.status))
+      .map(i => i.id),
+    [filteredInvoices, currentPage, itemsPerPage]
+  );
+
+  const allOnPageSelected = selectableOnPage.length > 0 && selectableOnPage.every(id => selectedIds.has(id));
+
+  const togglePageSelect = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allOnPageSelected) {
+        selectableOnPage.forEach(id => next.delete(id));
+      } else {
+        selectableOnPage.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  // Validate same customer for selected invoices
+  const selectedInvoices = useMemo(
+    () => invoices.filter(i => selectedIds.has(i.id)),
+    [invoices, selectedIds]
+  );
+  const distinctSelectedCustomers = useMemo(
+    () => Array.from(new Set(selectedInvoices.map(i => i.customer ?? ''))),
+    [selectedInvoices]
+  );
+  const sameCustomerSelected = distinctSelectedCustomers.length <= 1;
+  const selectedTotal = useMemo(
+    () => selectedInvoices.reduce((sum, i) => sum + (i.amount || 0), 0),
+    [selectedInvoices]
+  );
+
+  const handleMerge = async () => {
+    if (selectedIds.size < 2) {
+      toast.error('Mindestens 2 Rechnungen auswählen.');
+      return;
+    }
+    if (!sameCustomerSelected) {
+      toast.error('Alle ausgewählten Rechnungen müssen denselben Kunden haben.');
+      return;
+    }
+    setIsMerging(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/invoices/merge`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ invoiceIds: Array.from(selectedIds) }),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || 'Zusammenführen fehlgeschlagen.');
+      }
+      const data = await res.json();
+      toast.success(`Rechnungen wurden zusammengeführt: R-${data.mergedId}`);
+      clearSelection();
+      setShowMergeConfirm(false);
+      // Direkt zur neuen Rechnung navigieren
+      navigate(`/invoices/${data.mergedId}`);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message ?? 'Fehler beim Zusammenführen');
+    } finally {
+      setIsMerging(false);
+    }
   };
 
   return (
@@ -280,8 +392,21 @@ export function InvoicesPage() {
               </div>
             </div>
 
+            <button
+              onClick={() => setShowMerged(v => !v)}
+              className={cn(
+                "h-[38px] px-3 flex items-center gap-2 text-xs font-bold rounded-lg transition-colors border",
+                showMerged
+                  ? "bg-zinc-900 text-white border-zinc-900 dark:bg-zinc-100 dark:text-zinc-900 dark:border-zinc-100"
+                  : "bg-white dark:bg-zinc-900 text-zinc-500 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+              )}
+              title="Zusammengeführte Rechnungen anzeigen / ausblenden"
+            >
+              <Combine size={14} /> {showMerged ? 'Zusammengeführte ausblenden' : 'Zusammengeführte zeigen'}
+            </button>
+
             {(startDate || endDate || searchTerm) && (
-              <button 
+              <button
                 onClick={() => {
                   setSearchTerm('');
                   setStartDate('');
@@ -302,6 +427,15 @@ export function InvoicesPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400 text-[11px] font-bold uppercase tracking-wider">
+                <th className="px-2 py-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={allOnPageSelected}
+                    onChange={togglePageSelect}
+                    className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                    title="Alle auf dieser Seite auswählen"
+                  />
+                </th>
                 <th className="px-3 py-3">Rechnungsnr.</th>
                 <th className="px-2 py-3">Typ</th>
                 <th className="px-3 py-3">Kunde</th>
@@ -318,7 +452,7 @@ export function InvoicesPage() {
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center">
+                  <td colSpan={12} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
                       <p className="text-sm text-zinc-500">Rechnungen werden geladen...</p>
@@ -327,7 +461,7 @@ export function InvoicesPage() {
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center">
+                  <td colSpan={12} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <AlertCircle className="w-8 h-8 text-red-500" />
                       <p className="text-sm text-red-500 font-medium">{error}</p>
@@ -342,7 +476,7 @@ export function InvoicesPage() {
                 </tr>
               ) : currentInvoices.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-6 py-12 text-center">
+                  <td colSpan={12} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <FileText className="w-8 h-8 text-zinc-300" />
                       <p className="text-sm text-zinc-500">Keine Rechnungen gefunden.</p>
@@ -350,10 +484,32 @@ export function InvoicesPage() {
                   </td>
                 </tr>
               ) : (
-                currentInvoices.map((inv) => (
-                  <tr key={inv.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group">
+                currentInvoices.map((inv) => {
+                  const isMerged = (inv.status ?? '').toLowerCase() === 'zusammengeführt';
+                  const isStorno = (inv.status ?? '').toLowerCase() === 'storniert';
+                  const blocked = isMergeBlocked(inv.status);
+                  const checked = selectedIds.has(inv.id);
+                  return (
+                  <tr
+                    key={inv.id}
+                    className={cn(
+                      "hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors group",
+                      checked && "bg-emerald-50/40 dark:bg-emerald-900/10",
+                      isMerged && "opacity-60"
+                    )}
+                  >
+                    <td className="px-2 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={blocked}
+                        onChange={() => toggleSelected(inv.id, inv.status)}
+                        className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                        title={blocked ? `Nicht auswählbar (${inv.status})` : 'Für Zusammenführung auswählen'}
+                      />
+                    </td>
                     <td className="px-3 py-3">
-                      <span className="text-xs font-bold text-zinc-900 dark:text-white">{"R-" + inv.id}</span>
+                      <span className="text-xs font-bold text-zinc-900 dark:text-white font-mono">{inv.number}</span>
                     </td>
                     <td className="px-2 py-3">
                       <div className={cn(
@@ -401,12 +557,13 @@ export function InvoicesPage() {
                     </td>
                     <td className="px-3 py-3">
                       <Link
-                        to={inv.userType === "admin" ? `/payment/${inv.id}` : "#"}
+                        to={inv.userType === "admin" && !blocked ? `/payment/${inv.id}` : "#"}
                         className={cn(
                           "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider transition-all hover:scale-105 active:scale-95 cursor-pointer whitespace-nowrap",
                           inv.status.toLowerCase() === 'bezahlt' ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400" :
                             inv.status.toLowerCase() === 'offen' ? "bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400" :
-                              "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
+                              inv.status.toLowerCase() === 'zusammengeführt' ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400" :
+                                "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
                         )}
                       >
                         {inv.status}
@@ -425,7 +582,8 @@ export function InvoicesPage() {
                       <span className="text-xs text-zinc-500">{inv.user}</span>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -483,6 +641,122 @@ export function InvoicesPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating Action Bar — Multi-Select / Zusammenführen */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 print:hidden">
+          <div className="flex items-center gap-3 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 shadow-2xl rounded-full px-4 py-2.5 border border-zinc-700 dark:border-zinc-300 animate-in slide-in-from-bottom-4 duration-200">
+            <div className="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center text-sm font-bold">
+              {selectedIds.size}
+            </div>
+            <div className="text-xs">
+              <div className="font-bold">
+                {selectedIds.size} ausgewählt
+              </div>
+              <div className="text-[10px] opacity-70">
+                {sameCustomerSelected
+                  ? `Gesamt: ${new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(selectedTotal)}`
+                  : 'Mehrere Kunden — bitte denselben Kunden wählen'}
+              </div>
+            </div>
+            <div className="h-6 w-px bg-zinc-700 dark:bg-zinc-300 mx-1" />
+            <button
+              onClick={() => setShowMergeConfirm(true)}
+              disabled={selectedIds.size < 2 || !sameCustomerSelected}
+              className="flex items-center gap-2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-full transition-colors"
+            >
+              <Combine size={14} />
+              Zusammenführen
+            </button>
+            <button
+              onClick={clearSelection}
+              className="p-1.5 text-zinc-400 hover:text-white dark:hover:text-zinc-900 hover:bg-zinc-700 dark:hover:bg-zinc-300 rounded-full transition-colors"
+              title="Auswahl aufheben"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Merge Modal */}
+      {showMergeConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 print:hidden">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden">
+            <div className="p-6 border-b border-zinc-100 dark:border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600">
+                  <Combine size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                    Rechnungen zusammenführen?
+                  </h3>
+                  <p className="text-xs text-zinc-500">
+                    {selectedIds.size} Rechnungen werden zu einer kombinierten Rechnung
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-4 max-h-[40vh] overflow-y-auto">
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-zinc-400 uppercase">Ausgewählte Rechnungen</p>
+                <div className="space-y-1">
+                  {selectedInvoices.map(inv => (
+                    <div key={inv.id} className="flex justify-between text-xs bg-zinc-50 dark:bg-zinc-800/50 rounded-lg px-3 py-2">
+                      <span className="font-mono font-bold">{inv.number}</span>
+                      <span className="text-zinc-500 truncate mx-3">{inv.customer}</span>
+                      <span className="font-bold whitespace-nowrap">
+                        {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(inv.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-900/10 rounded-lg space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-zinc-500">Kunde</span>
+                  <span className="font-bold">{distinctSelectedCustomers[0]}</span>
+                </div>
+                <div className="flex justify-between text-sm font-bold">
+                  <span>Neuer Gesamtbetrag</span>
+                  <span className="text-emerald-600">
+                    {new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(selectedTotal)}
+                  </span>
+                </div>
+              </div>
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-lg flex gap-2">
+                <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+                  Die Quell-Rechnungen werden als <b>„zusammengeführt"</b> markiert und in der Standard-Liste ausgeblendet.
+                  Daten gehen nicht verloren — sie bleiben in der DB und können über „Zusammengeführte zeigen" eingesehen werden.
+                </p>
+              </div>
+            </div>
+            <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-100 dark:border-zinc-800 flex gap-3">
+              <button
+                onClick={() => setShowMergeConfirm(false)}
+                disabled={isMerging}
+                className="flex-1 px-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 font-bold rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors text-sm"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleMerge}
+                disabled={isMerging}
+                className="flex-[2] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold rounded-lg transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-sm"
+              >
+                {isMerging ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Check size={16} />
+                )}
+                Zusammenführen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

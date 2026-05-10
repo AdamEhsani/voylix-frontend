@@ -12,6 +12,7 @@ import {
   X,
   Calendar,
   TrendingUp,
+  Euro,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { formatCurrency, cn } from '../utils';
@@ -31,6 +32,7 @@ type DashboardResponse = {
   token: number;
   rechnungenCount: number;
   customersCount: number;
+  gesamtumsatz: number;
   unpaidInvoicesCount: number;
   unpaidInvoices: UnpaidInvoice[];
 };
@@ -44,6 +46,7 @@ export function DashboardPage() {
     token: 0,
     rechnungenCount: 0,
     customersCount: 0,
+    gesamtumsatz: 0,
     unpaidInvoicesCount: 0,
     unpaidInvoices: [],
   });
@@ -84,6 +87,7 @@ export function DashboardPage() {
           token: data.token ?? 0,
           rechnungenCount: data.rechnungenCount ?? 0,
           customersCount: data.customersCount ?? 0,
+          gesamtumsatz: Number(data.gesamtumsatz ?? 0),
           unpaidInvoicesCount: data.unpaidInvoicesCount ?? 0,
           unpaidInvoices: data.unpaidInvoices ?? [],
         });
@@ -115,12 +119,12 @@ export function DashboardPage() {
       description: 'Alle erstellten Rechnungen im System',
     },
     {
-      label: 'Aktive Kunden',
-      value: dashboard.customersCount.toLocaleString('de-DE'),
-      icon: Users,
+      label: 'Gesamtumsatz',
+      value: formatCurrency(dashboard.gesamtumsatz),
+      icon: Euro,
       color: 'text-purple-600',
       bg: 'bg-purple-50 dark:bg-purple-900/20',
-      description: 'Kunden mit mindestens einer Buchung',
+      description: 'Summe aller Rechnungen (ohne Stornos)',
     },
     {
       label: 'Unbezahlt',

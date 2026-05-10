@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { cn } from '../utils';
 import { toast } from 'sonner';
+import { AddressAutocomplete, AddressSelection } from '../components/AddressAutocomplete';
+import { KNOWN_TITLES, joinTitleAndName } from '../utils/customerTitle';
 
 export function CreateCustomerPage() {
   const navigate = useNavigate();
@@ -23,6 +25,7 @@ export function CreateCustomerPage() {
   const [customerType, setCustomerType] = useState<'person' | 'company'>('person');
 
   const [formData, setFormData] = useState({
+    title: '',
     firstName: '',
     lastName: '',
     dateOfBirth: '',
@@ -49,6 +52,26 @@ export function CreateCustomerPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Voylix: vaqti user yek pishnehad-e adress entekhab kone, hame field-haye marbut por mishan
+  const applyPersonAddress = (addr: AddressSelection) => {
+    setFormData(prev => ({
+      ...prev,
+      street: addr.street,
+      postalCode: addr.postalCode,
+      city: addr.city,
+      country: addr.country || prev.country || 'Deutschland',
+    }));
+  };
+  const applyCompanyAddress = (addr: AddressSelection) => {
+    setFormData(prev => ({
+      ...prev,
+      companyStreet: addr.street,
+      companyPostalCode: addr.postalCode,
+      companyCity: addr.city,
+      companyCountry: addr.country || prev.companyCountry || 'Deutschland',
+    }));
+  };
+
   function getAgencyIdFromToken(token: string | null) {
     if (!token) return null;
     try {
@@ -67,9 +90,12 @@ export function CreateCustomerPage() {
     const token = localStorage.getItem("token");
     const agencyId = getAgencyIdFromToken(token);
 
+    // Voylix: title ba prefix-e FirstName store mishe (bedoone migration-e DB).
+    const firstNameWithTitle = joinTitleAndName(formData.title, formData.firstName);
+
     const payload = {
       AgencyId: agencyId,
-      FirstName: formData.firstName,
+      FirstName: firstNameWithTitle,
       LastName: formData.lastName,
       DateOfBirth: formData.dateOfBirth,
       Nationality: formData.nationality,
@@ -213,6 +239,21 @@ export function CreateCustomerPage() {
               </div>
 
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Anrede / Titel (optional)</label>
+                  <select
+                    name="title"
+                    value={formData.title}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                  >
+                    <option value="">— ohne —</option>
+                    {KNOWN_TITLES.map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-zinc-400">Wird vor dem Vornamen angezeigt (z.B. „Dr. Max Mustermann"). Kein DB-Schema-Wechsel — wird im Vornamen gespeichert.</p>
+                </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Vorname</label>
                   <input
@@ -268,16 +309,15 @@ export function CreateCustomerPage() {
                 </h2>
               </div>
               <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Straße, Hausnummer</label>
-                  <input
-                    type="text"
-                    name="street"
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Straße (mit Suchvorschlag) — Hausnummer manuell anhängen</label>
+                  <AddressAutocomplete
                     value={formData.street}
-                    onChange={handleInputChange}
-                    placeholder="Musterstraße 1"
-                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                    onChange={(v) => setFormData(prev => ({ ...prev, street: v }))}
+                    onSelect={applyPersonAddress}
+                    placeholder="z.B. Harburger Ch... → Vorschlag wählen, dann Hausnr. anhängen"
                   />
+                  <p className="text-[10px] text-zinc-400">Tipp: Ab 4 Zeichen erscheinen Vorschläge. Nach Auswahl Hausnummer am Ende eingeben (z.B. „Harburger Chaussee 12").</p>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Stadt</label>
@@ -301,7 +341,7 @@ export function CreateCustomerPage() {
                     className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 md:col-span-2">
                   <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Land</label>
                   <input
                     type="text"
@@ -380,16 +420,15 @@ export function CreateCustomerPage() {
                     className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Straße, Hausnummer</label>
-                  <input
-                    type="text"
-                    name="companyStreet"
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Straße (mit Suchvorschlag) — Hausnummer manuell anhängen</label>
+                  <AddressAutocomplete
                     value={formData.companyStreet}
-                    onChange={handleInputChange}
-                    placeholder="Musterstraße 1"
-                    className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                    onChange={(v) => setFormData(prev => ({ ...prev, companyStreet: v }))}
+                    onSelect={applyCompanyAddress}
+                    placeholder="z.B. Harburger Ch... → Vorschlag wählen, dann Hausnr. anhängen"
                   />
+                  <p className="text-[10px] text-zinc-400">Tipp: Ab 4 Zeichen erscheinen Vorschläge. Nach Auswahl Hausnummer am Ende eingeben.</p>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider">Stadt</label>

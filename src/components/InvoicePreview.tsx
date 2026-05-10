@@ -174,7 +174,8 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
 
         const shouldShowFlight =
           type === 'Flug' ||
-          type === 'Package';
+          type === 'Pauschal' ||
+          type === 'Package'; // legacy alias
 
         const hasFlightData =
           (data.flight_details?.segmentsTo?.length ?? 0) > 0 ||
@@ -227,7 +228,8 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
         const type = data.invoice_meta?.invoice_type;
         const shouldShowHotel =
           type === 'Hotel' ||
-          type === 'Package';
+          type === 'Pauschal' ||
+          type === 'Package'; // legacy alias
         
         if (!shouldShowHotel || !data.hotelDto) return null;
         return (

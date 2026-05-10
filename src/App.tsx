@@ -38,7 +38,8 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <BrowserRouter>
+        {/* Voylix: tu prod ru voylix.de/app sharah dade mishe — ba basename React Router taght */}
+        <BrowserRouter basename={import.meta.env.PROD ? '/app' : '/'}>
           <LogoProvider>
             <Suspense fallback={<PageLoader />}>
               <Routes>

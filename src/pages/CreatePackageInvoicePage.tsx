@@ -8,7 +8,7 @@ export function CreatePackageInvoicePage() {
   const navigate = useNavigate();
   const [data, setData] = useState<TravelInvoice>({
     invoice_meta: {
-      invoice_type: "Package",
+      invoice_type: "Pauschal",
       invoice_number: `RE-P-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       invoice_id: `R-P-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       invoice_date: new Date().toISOString().slice(0, 10),

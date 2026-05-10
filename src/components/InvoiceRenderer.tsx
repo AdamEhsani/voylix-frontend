@@ -153,6 +153,8 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
   // Fee Management State
   const [isFeeMainModalOpen, setIsFeeMainModalOpen] = useState(false);
+  // Voylix: false = mode-e add-e moamouli; true = mode-e bulk-edit (hame line_items ba ham edit).
+  const [isBulkEditMode, setIsBulkEditMode] = useState(false);
   const [isFeeListModalOpen, setIsFeeListModalOpen] = useState(false);
   const [isCreateFeeModalOpen, setIsCreateFeeModalOpen] = useState(false);
   const [feeToEdit, setFeeToEdit] = useState<{ id: number, name: string, amount: number } | null>(null);
@@ -614,6 +616,92 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
     })
   }
 
+  // Voylix: parse-e name-e fee.
+  // Format-haye mojud: "Erwachsene (2x 350,00 €)", "Kind (1x 100,00 €)", "Visa (1x 80,00 €)"
+  // Vaqti regex match nakone, mishe ke fee dasti zad shode bashe → as 'custom' name=raw treat mikonim, qty=1, unitPrice=amount
+  const parseFeeName = (name: string, amount: number): { kind: 'erwachsene' | 'kind' | 'custom'; qty: number; unitPrice: number; customName: string } => {
+    const safeName = (name ?? '').trim();
+    const match = safeName.match(/^(.+?)\s*\((\d+)\s*x\s*([\d.,]+)\s*€\)\s*$/i);
+    let kind: 'erwachsene' | 'kind' | 'custom' = 'custom';
+    let qty = 1;
+    let unitPrice = Number(amount) || 0;
+    let baseName = safeName;
+    if (match) {
+      baseName  = match[1].trim();
+      qty       = parseInt(match[2], 10) || 1;
+      // Format-e Almani: "350,00" → 350.00
+      const priceStr = match[3].replace(/\./g, '').replace(',', '.');
+      const parsed = parseFloat(priceStr);
+      if (!isNaN(parsed)) unitPrice = parsed;
+    }
+    const lowerBase = baseName.toLowerCase();
+    if (lowerBase === 'erwachsene' || lowerBase === 'erwachsen') kind = 'erwachsene';
+    else if (lowerBase === 'kind' || lowerBase === 'kinder')      kind = 'kind';
+    else                                                          kind = 'custom';
+    return { kind, qty, unitPrice, customName: baseName };
+  };
+
+  // Voylix: hame line_items ro pre-fill mikone tu modal — bulk edit mode.
+  // Erwachsene/Kind faqat ye row daran (aval-i ke peyda shod estefade mishe);
+  // baqiye-i (custom + tekraari) be customs migran.
+  const startBulkEditFees = () => {
+    const items = payments.line_items ?? [];
+    let erwachsene = { qty: 1, price: '' };
+    let kind       = { qty: 1, price: '' };
+    let erwSet     = false;
+    let kindSet    = false;
+    const customs: { id: number; name: string; qty: number; price: string }[] = [];
+
+    items.forEach((item, idx) => {
+      const parsed = parseFeeName(item.name ?? '', Number(item.amount ?? 0));
+      if (parsed.kind === 'erwachsene' && !erwSet) {
+        erwachsene = { qty: parsed.qty, price: String(parsed.unitPrice) };
+        erwSet = true;
+      } else if (parsed.kind === 'kind' && !kindSet) {
+        kind = { qty: parsed.qty, price: String(parsed.unitPrice) };
+        kindSet = true;
+      } else {
+        customs.push({
+          id: -(idx + 1), // negativ = local-only id (na az backend Fee Liste)
+          name: parsed.customName || (parsed.kind === 'erwachsene' ? 'Erwachsene' : parsed.kind === 'kind' ? 'Kind' : `Position ${customs.length + 1}`),
+          qty: parsed.qty,
+          price: String(parsed.unitPrice),
+        });
+      }
+    });
+
+    setMainFeeInput({ erwachsene, kind, customs });
+    setIsBulkEditMode(true);
+    setIsFeeMainModalOpen(true);
+  };
+
+  // Modal close — har mode. Reset state komak mikonad.
+  const closeFeeModal = () => {
+    setIsFeeMainModalOpen(false);
+    setIsBulkEditMode(false);
+    setMainFeeInput({
+      erwachsene: { qty: 1, price: '' },
+      kind:       { qty: 1, price: '' },
+      customs:    [],
+    });
+  };
+
+  // Voylix: tu mode-e bulk-edit, hame line_items ro replace mikonim.
+  const replaceAllFees = (fees: { name: string; amount: number }[]) => {
+    const total = fees.reduce((sum, f) => sum + Number(f.amount), 0);
+    onUpdate({
+      ...data,
+      payments: {
+        ...payments,
+        line_items: fees,
+        invoice_total: total,
+        invoice_balance: 0
+      }
+    });
+    closeFeeModal();
+    toast.success(fees.length === 0 ? 'Alle Gebühren entfernt' : 'Gebühren aktualisiert');
+  };
+
   const handleSelectCustomer = (selected: BackendCustomer) => {
     const fullName = `${selected.firstName} ${selected.lastName}`.trim();
     if (pickingFor === 'customer') {
@@ -746,7 +834,6 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
     const token = localStorage.getItem("token");
     const finalData = buildFinalInvoice();
-    console.log("Final invoice data to save:", finalData);
     const isUpdate = !!data.id;
 
     // Voylix: bar asase invoice_type be endpoint-e dorost POST kon
@@ -940,11 +1027,13 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] text-zinc-500 uppercase font-bold">Nummer:</span>
+                {/* Voylix: Rechnungsnummer auto-generated mishe (per-agency sequence — German law: lückenlos).
+                    Read-only — user nemitooneh edit kone. */}
                 <input
-                  value={invoiceMeta?.invoice_number ?? ''}
-                  onChange={e => updateInvoiceMeta('invoice_number', e.target.value)}
-                  className="text-xs font-mono text-right bg-transparent border-b border-transparent hover:border-zinc-200 focus:border-emerald-500 outline-none w-32 transition-colors"
-                  placeholder="RE-2024-001"
+                  value={invoiceMeta?.invoice_number ?? '—'}
+                  readOnly
+                  title="Automatisch vergeben (lückenlose Nummer pro Agentur)"
+                  className="text-xs font-mono font-bold text-right bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 rounded px-2 py-0.5 outline-none w-32 cursor-not-allowed text-zinc-700 dark:text-zinc-300"
                 />
               </div>
               <div className="flex items-center justify-between gap-2">
@@ -962,6 +1051,28 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
         {/* CUSTOMER */}
         <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 space-y-6">
+          {/* Voylix: agar Invoice be hich Kunde-i vasl nashode (e.g. PDF Import bedoone match), banner */}
+          {(!customer?.customer_id && !customer?.customer_name) && (
+            <div className="p-4 rounded-xl border-2 border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 flex items-start gap-3 print:hidden">
+              <Info size={20} className="text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Kein Kunde zugeordnet</p>
+                <p className="text-xs text-amber-600 dark:text-amber-500 mt-1 leading-relaxed">
+                  Diese Rechnung hat noch keinen Kunden. Bitte wählen Sie einen Kunden aus oder legen Sie einen neuen an, bevor Sie speichern oder Zahlungen erfassen.
+                </p>
+                <button
+                  onClick={() => {
+                    setPickingFor('customer');
+                    setIsCustomerModalOpen(true);
+                  }}
+                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors"
+                >
+                  <Search size={12} /> Kunde jetzt zuordnen
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
               <User size={14} /> Rechnungsempfänger
@@ -1142,7 +1253,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
         </div>
 
         {/* FLIGHT DETAILS */}
-        {(invoiceMeta.invoice_type === 'Flug' || invoiceMeta.invoice_type === 'Package') && (
+        {(invoiceMeta.invoice_type === 'Flug' || invoiceMeta.invoice_type === 'Pauschal' || invoiceMeta.invoice_type === 'Package') && (
           <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/30 dark:bg-zinc-800/10 space-y-6">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
@@ -1335,7 +1446,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
         )}
 
         {/* HOTEL DETAILS */}
-        {(invoiceMeta.invoice_type === 'Hotel' || invoiceMeta.invoice_type === 'Package') && (
+        {(invoiceMeta.invoice_type === 'Hotel' || invoiceMeta.invoice_type === 'Pauschal' || invoiceMeta.invoice_type === 'Package') && (
           <div className="p-8 border-b border-zinc-100 dark:border-zinc-800 space-y-6">
             <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
               <Briefcase size={14} /> Hotel Details
@@ -1473,7 +1584,16 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
               <CreditCard size={14} /> Gebühren & Leistungen
             </h3>
             <button
-              onClick={() => setIsFeeMainModalOpen(true)}
+              onClick={() => {
+                // Voylix: motmaen-i mode-e add-e tamiz; har edit-e qabli ro reset kon
+                setIsBulkEditMode(false);
+                setMainFeeInput({
+                  erwachsene: { qty: 1, price: '' },
+                  kind:       { qty: 1, price: '' },
+                  customs:    [],
+                });
+                setIsFeeMainModalOpen(true);
+              }}
               className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg hover:bg-emerald-100 transition-all border border-emerald-200 dark:border-emerald-800/50 print:hidden"
             >
               <Plus size={14} /> Gebühr hinzufügen
@@ -1496,7 +1616,12 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                   </div>
 
                   <div className="flex gap-4 items-center">
-                    <span className="text-sm font-bold text-zinc-900 dark:text-white">
+                    <span className={cn(
+                      "text-sm font-bold",
+                      Number(item?.amount ?? 0) < 0
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-zinc-900 dark:text-white"
+                    )}>
                       {formatCurrency(
                         Number(item?.amount ?? 0),
                         payments.currency
@@ -1526,19 +1651,26 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
             <span className="font-mono text-xs uppercase tracking-tight">Währung: {payments.currency}</span>
           </div>
 
-          <div className="w-full md:w-72 space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-bold text-zinc-500 uppercase">Gesamtpreis</span>
-              <div className="relative w-32">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold">€</span>
-                <input
-                  type="number"
-                  value={invoiceTotal}
-                  disabled
-                  className="w-full pl-7 pr-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-right font-bold outline-none cursor-not-allowed opacity-70"
-                />
-              </div>
+          <div className="w-full md:w-auto flex items-center gap-3">
+            <span className="text-sm font-bold text-zinc-500 uppercase">Gesamtpreis</span>
+            <div className="relative w-32">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold">€</span>
+              <input
+                type="number"
+                value={invoiceTotal}
+                disabled
+                className="w-full pl-7 pr-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-right font-bold outline-none cursor-not-allowed opacity-70"
+              />
             </div>
+            <button
+              type="button"
+              onClick={startBulkEditFees}
+              disabled={(payments.line_items?.length ?? 0) === 0}
+              className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 rounded-lg transition-all border border-zinc-200 dark:border-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed print:hidden"
+              title="Alle Gebühren bearbeiten"
+            >
+              <Edit2 size={16} />
+            </button>
           </div>
         </div>
 
@@ -1647,12 +1779,18 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                     <Calculator size={20} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Gebühr hinzufügen</h3>
-                    <p className="text-xs text-zinc-500">Geben Sie die Gebühren für diese Rechnung ein</p>
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                      {isBulkEditMode ? 'Gebühren bearbeiten' : 'Gebühr hinzufügen'}
+                    </h3>
+                    <p className="text-xs text-zinc-500">
+                      {isBulkEditMode
+                        ? 'Bearbeiten Sie alle Gebühren dieser Rechnung — vorhandene werden ersetzt'
+                        : 'Geben Sie die Gebühren für diese Rechnung ein'}
+                    </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => setIsFeeMainModalOpen(false)}
+                  onClick={closeFeeModal}
                   className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl transition-all"
                 >
                   <X size={20} />
@@ -1680,10 +1818,14 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                     <label className="text-[10px] font-bold text-zinc-400 uppercase mb-1 block">Preis (€)</label>
                     <input
                       type="number"
+                      step="0.01"
                       value={mainFeeInput.erwachsene.price}
                       onChange={(e) => setMainFeeInput(prev => ({ ...prev, erwachsene: { ...prev.erwachsene, price: e.target.value } }))}
-                      placeholder="0.00"
-                      className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
+                      placeholder="0.00 / -10.00 für Rabatt"
+                      className={cn(
+                        "w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-bold",
+                        parseFloat(mainFeeInput.erwachsene.price) < 0 && "text-red-600 dark:text-red-400"
+                      )}
                     />
                   </div>
                 </div>
@@ -1706,10 +1848,14 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                   <div className="col-span-4">
                     <input
                       type="number"
+                      step="0.01"
                       value={mainFeeInput.kind.price}
                       onChange={(e) => setMainFeeInput(prev => ({ ...prev, kind: { ...prev.kind, price: e.target.value } }))}
-                      placeholder="0.00"
-                      className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
+                      placeholder="0.00 / -10.00 für Rabatt"
+                      className={cn(
+                        "w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-bold",
+                        parseFloat(mainFeeInput.kind.price) < 0 && "text-red-600 dark:text-red-400"
+                      )}
                     />
                   </div>
                 </div>
@@ -1746,18 +1892,25 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                     <div className="col-span-4">
                       <input
                         type="number"
+                        step="0.01"
                         value={custom.price}
                         onChange={(e) => setMainFeeInput(prev => ({
                           ...prev,
                           customs: prev.customs.map((c, i) => i === idx ? { ...c, price: e.target.value } : c)
                         }))}
-                        placeholder="0.00"
-                        className="w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-emerald-600 dark:text-emerald-400"
+                        placeholder="0.00 / -10.00 für Rabatt"
+                        className={cn(
+                          "w-full px-3 py-2 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-bold",
+                          parseFloat(custom.price) < 0
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-emerald-600 dark:text-emerald-400"
+                        )}
                       />
                     </div>
                   </div>
                 ))}
 
+                {/* "Gebühr aus Liste" tu har do mode kar mikone — bulk edit ham mitooni custom-e jadid ezafe koni */}
                 <button
                   onClick={() => setIsFeeListModalOpen(true)}
                   className="w-full py-4 mt-2 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl text-sm font-bold text-zinc-400 hover:border-emerald-500/50 hover:text-emerald-500 hover:bg-emerald-50/50 dark:hover:bg-emerald-900/10 transition-all flex items-center justify-center gap-2"
@@ -1768,7 +1921,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
 
               <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-100 dark:border-zinc-800 flex gap-3">
                 <button
-                  onClick={() => setIsFeeMainModalOpen(false)}
+                  onClick={closeFeeModal}
                   className="flex-1 px-4 py-3 border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 font-bold rounded-xl hover:bg-white dark:hover:bg-zinc-900 transition-all text-sm"
                 >
                   Abbrechen
@@ -1776,42 +1929,55 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
                 <button
                   onClick={() => {
                     const finalFees: { name: string, amount: number }[] = [];
-                    if (parseFloat(mainFeeInput.erwachsene.price) > 0) {
+                    // Voylix: parseFloat-e safe ke negative ham qabul mikone (Gutschrift / Rabatt)
+                    const erwPrice = parseFloat(mainFeeInput.erwachsene.price);
+                    if (!isNaN(erwPrice) && erwPrice !== 0) {
                       finalFees.push({
-                        name: `Erwachsene (${mainFeeInput.erwachsene.qty}x ${formatCurrency(parseFloat(mainFeeInput.erwachsene.price), payments.currency)})`,
-                        amount: parseFloat(mainFeeInput.erwachsene.price) * mainFeeInput.erwachsene.qty
+                        name: `Erwachsene (${mainFeeInput.erwachsene.qty}x ${formatCurrency(erwPrice, payments.currency)})`,
+                        amount: erwPrice * mainFeeInput.erwachsene.qty
                       });
                     }
-                    if (parseFloat(mainFeeInput.kind.price) > 0) {
+                    const kindPrice = parseFloat(mainFeeInput.kind.price);
+                    if (!isNaN(kindPrice) && kindPrice !== 0) {
                       finalFees.push({
-                        name: `Kind (${mainFeeInput.kind.qty}x ${formatCurrency(parseFloat(mainFeeInput.kind.price), payments.currency)})`,
-                        amount: parseFloat(mainFeeInput.kind.price) * mainFeeInput.kind.qty
+                        name: `Kind (${mainFeeInput.kind.qty}x ${formatCurrency(kindPrice, payments.currency)})`,
+                        amount: kindPrice * mainFeeInput.kind.qty
                       });
                     }
                     mainFeeInput.customs.forEach(custom => {
-                      if (parseFloat(custom.price) > 0) {
+                      const customPrice = parseFloat(custom.price);
+                      if (!isNaN(customPrice) && customPrice !== 0) {
                         finalFees.push({
-                          name: `${custom.name} (${custom.qty}x ${formatCurrency(parseFloat(custom.price), payments.currency)})`,
-                          amount: parseFloat(custom.price) * custom.qty
+                          name: `${custom.name} (${custom.qty}x ${formatCurrency(customPrice, payments.currency)})`,
+                          amount: customPrice * custom.qty
                         });
                       }
                     });
 
-                    if (finalFees.length > 0) {
+                    if (isBulkEditMode) {
+                      // Voylix: bulk edit — hame line_items ba list-e jadid replace mishe
+                      replaceAllFees(finalFees);
+                    } else if (finalFees.length > 0) {
                       addMultipleFees(finalFees);
-                      setIsFeeMainModalOpen(false);
-                      // Reset
-                      setMainFeeInput({
-                        erwachsene: { qty: 1, price: '' },
-                        kind: { qty: 1, price: '' },
-                        customs: []
-                      });
+                      closeFeeModal();
                     }
                   }}
-                  disabled={!mainFeeInput.erwachsene.price && !mainFeeInput.kind.price && mainFeeInput.customs.filter(c => parseFloat(c.price) > 0).length === 0}
+                  disabled={(() => {
+                    // Tu bulk-edit mode mojaaze list khali bashe (yani user mitoone hame ro pak kone)
+                    if (isBulkEditMode) return false;
+                    const erw = parseFloat(mainFeeInput.erwachsene.price);
+                    const kind = parseFloat(mainFeeInput.kind.price);
+                    const anyCustom = mainFeeInput.customs.some(c => {
+                      const v = parseFloat(c.price);
+                      return !isNaN(v) && v !== 0;
+                    });
+                    const erwOk = !isNaN(erw) && erw !== 0;
+                    const kindOk = !isNaN(kind) && kind !== 0;
+                    return !erwOk && !kindOk && !anyCustom;
+                  })()}
                   className="flex-[2] px-6 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition-all text-sm shadow-lg shadow-emerald-500/20"
                 >
-                  Alle hinzufügen
+                  {isBulkEditMode ? 'Änderungen speichern' : 'Alle hinzufügen'}
                 </button>
               </div>
             </div>
