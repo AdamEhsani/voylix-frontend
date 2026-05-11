@@ -173,6 +173,8 @@ export interface TravelInvoice {
     invoice_balance: string | number;
     payment_date: string;
     currency: string; // "EUR"
+    /** Voylix: MwSt-Rate (e.g. 0.19 = 19%). null/undefined = ohne MWsT */
+    mwst_rate?: number | null;
     entries?: PaymentEntry[]; // Keep for UI compatibility
     line_items?: { name: string; amount: number }[];
   };

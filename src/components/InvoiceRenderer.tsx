@@ -149,6 +149,8 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
   const [loadingCustomers, setLoadingCustomers] = useState(false)
   const [printSettings, setPrintSettings] = useState<InvoiceDesignerSettings | null>(null)
   const [isPrinting, setIsPrinting] = useState(false)
+  // Voylix: agency baray-e print pre-loaded mishe — jelo-girish az missing-data hangaame Druck.
+  const [printAgency, setPrintAgency] = useState<any | null>(null)
   const [agencyLogoPath, setAgencyLogoPath] = useState<string | null>(null);
 
   // Fee Management State
@@ -753,17 +755,27 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
   const handlePrint = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}/api/PrintSetting/loadSetting`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
 
-      if (response.ok) {
-        const settings = await response.json();
-        // Voylix: agar JSON-e qadimi-ye agency notizen-related field-ha ya visibility-ye notizen
-        // ro nadarad, defaultash mishe ke notizen tu print zaher mishe.
+      // Voylix: parallel — settings va agency ham-zaman fetch mishan
+      const [settingsRes, agencyRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/PrintSetting/loadSetting`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+        fetch(`${API_BASE_URL}/api/Agency`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }),
+      ]);
+
+      // Agency response — { agency: {...}, emailUser: "..." }
+      let agencyData = null;
+      if (agencyRes.ok) {
+        const ag = await agencyRes.json();
+        agencyData = ag?.agency ?? ag;
+      }
+      setPrintAgency(agencyData);
+
+      if (settingsRes.ok) {
+        const settings = await settingsRes.json();
         const merged: InvoiceDesignerSettings = {
           ...settings,
           sectionVisibility: {
@@ -973,6 +985,9 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
         payment_date: data.payments?.payment_date ?? '',
         currency: data.payments?.currency ?? 'EUR',
 
+        // Voylix: MwsT rate (0.19 = 19%, null = ohne MWsT) — bayd hatman tu payload bashe
+        mwst_rate: data.payments?.mwst_rate ?? null,
+
         line_items: (data.payments?.line_items ?? []).map(item => ({
           name: item.name,
           amount: Number(item.amount),
@@ -983,6 +998,13 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       agencyUser: undefined,
       system_meta: { ...data.system_meta },
       legal_notes: { ...data.legal_notes },
+      // Voylix: Notiz-e mahsus-e in Rechnung (faqat 1 entry — text azad).
+      notizen: (data.notizen ?? []).map((n, i) => ({
+        orderIndex:     n.orderIndex ?? i,
+        text:           n.text ?? '',
+        includeInPrint: n.includeInPrint ?? true,
+        isProtected:    n.isProtected ?? false,
+      })),
     };
   };
 
@@ -991,7 +1013,7 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
       {/* HIDDEN PRINT PREVIEW */}
       {isPrinting && printSettings && (
         <div className="hidden print:block absolute top-0 left-0 w-full bg-white z-[9999] overflow-visible">
-          <InvoicePreview data={data} settings={printSettings} agencyLogoPath={agencyLogoPath} />
+          <InvoicePreview data={data} settings={printSettings} agencyLogoPath={agencyLogoPath} agency={printAgency} />
         </div>
       )}
 
@@ -1640,38 +1662,121 @@ export function InvoiceRenderer({ data, onUpdate, onSave }: InvoiceRendererProps
           </div>
         </div>
 
-        {/* TOTAL */}
-        <div className="p-8 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-4 text-zinc-500 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Bereit zum Speichern</span>
-            </div>
-            <span className="text-zinc-300 dark:text-zinc-700">|</span>
-            <span className="font-mono text-xs uppercase tracking-tight">Währung: {payments.currency}</span>
-          </div>
+        {/* TOTAL — ba MWsT-Optionen va Netto/Brutto breakdown */}
+        {(() => {
+          // Voylix: invoiceTotal = Netto (jam-e line_items). Agar mwst_rate set bashe → Brutto hesab mishe.
+          const nettoNum  = Number(invoiceTotal) || 0;
+          const mwstRate  = Number(payments.mwst_rate ?? 0) || 0;
+          const mwstOn    = mwstRate > 0;
+          const mwstAmt   = Math.round(nettoNum * mwstRate * 100) / 100;
+          const bruttoNum = nettoNum + mwstAmt;
 
-          <div className="w-full md:w-auto flex items-center gap-3">
-            <span className="text-sm font-bold text-zinc-500 uppercase">Gesamtpreis</span>
-            <div className="relative w-32">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold">€</span>
-              <input
-                type="number"
-                value={invoiceTotal}
-                disabled
-                className="w-full pl-7 pr-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-right font-bold outline-none cursor-not-allowed opacity-70"
-              />
+          const toggleMwst = () => {
+            onUpdate({
+              ...data,
+              payments: {
+                ...payments,
+                mwst_rate: mwstOn ? null : 0.19,
+              },
+            });
+          };
+
+          return (
+            <div className="p-8 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/20 flex flex-col md:flex-row justify-between items-start gap-6">
+              <div className="flex flex-wrap items-center gap-4 text-zinc-500 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Bereit zum Speichern</span>
+                </div>
+                <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                <span className="font-mono text-xs uppercase tracking-tight">Währung: {payments.currency}</span>
+                <span className="text-zinc-300 dark:text-zinc-700">|</span>
+                {/* MWsT Checkbox */}
+                <label className="flex items-center gap-2 cursor-pointer select-none print:hidden">
+                  <input
+                    type="checkbox"
+                    checked={mwstOn}
+                    onChange={toggleMwst}
+                    className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className={cn(
+                    "font-mono text-xs uppercase tracking-tight",
+                    mwstOn && "text-emerald-600 font-bold"
+                  )}>
+                    MWsT 19%
+                  </span>
+                </label>
+              </div>
+
+              <div className="w-full md:w-72 space-y-2">
+                {mwstOn && (
+                  <>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-zinc-500 uppercase font-bold tracking-tight">Netto</span>
+                      <span className="font-mono tabular-nums">{formatCurrency(nettoNum, payments.currency)}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-zinc-500 uppercase font-bold tracking-tight">USt 19%</span>
+                      <span className="font-mono tabular-nums">{formatCurrency(mwstAmt, payments.currency)}</span>
+                    </div>
+                    <div className="border-t border-zinc-200 dark:border-zinc-700 my-1" />
+                  </>
+                )}
+                <div className="flex justify-between items-center gap-3">
+                  <span className="text-sm font-bold text-zinc-700 dark:text-zinc-200 uppercase">{mwstOn ? 'Gesamt (Brutto)' : 'Gesamtpreis'}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="relative w-32">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 font-bold">€</span>
+                      <input
+                        type="text"
+                        value={(mwstOn ? bruttoNum : nettoNum).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        disabled
+                        className="w-full pl-7 pr-3 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-right font-bold outline-none cursor-not-allowed opacity-70"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={startBulkEditFees}
+                      disabled={(payments.line_items?.length ?? 0) === 0}
+                      className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 rounded-lg transition-all border border-zinc-200 dark:border-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed print:hidden"
+                      title="Alle Gebühren bearbeiten"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={startBulkEditFees}
-              disabled={(payments.line_items?.length ?? 0) === 0}
-              className="p-2 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 rounded-lg transition-all border border-zinc-200 dark:border-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed print:hidden"
-              title="Alle Gebühren bearbeiten"
-            >
-              <Edit2 size={16} />
-            </button>
+          );
+        })()}
+
+        {/* RECHNUNGS-NOTIZ — yek text-e mahsus-e in Rechnung ke tu print miad */}
+        <div className="p-8 border-t border-zinc-100 dark:border-zinc-800 space-y-3 print:hidden">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+              Notiz für diese Rechnung
+            </label>
+            <span className="text-[10px] text-zinc-400">erscheint am Ende des Drucks</span>
           </div>
+          <textarea
+            value={data.notizen?.[0]?.text ?? ''}
+            onChange={(e) => {
+              const text = e.target.value;
+              const existing = data.notizen?.[0];
+              onUpdate({
+                ...data,
+                notizen: [{
+                  ...(existing ?? {}),
+                  orderIndex: 0,
+                  text,
+                  includeInPrint: true,
+                }],
+              });
+            }}
+            rows={3}
+            placeholder="z.B. Vielen Dank für Ihren Auftrag, wir wünschen eine angenehme Reise..."
+            className="w-full px-4 py-2.5 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all resize-y"
+          />
         </div>
 
         {/* ACTIONS */}

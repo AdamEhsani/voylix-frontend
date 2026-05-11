@@ -21,6 +21,9 @@ import {
   Clock,
   UserCog,
   Euro,
+  Percent,
+  Receipt,
+  Info,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '../utils';
@@ -121,7 +124,7 @@ interface UserRow {
   avgInvoice: number;
 }
 
-type Tab = 'overview' | 'payments' | 'invoices' | 'customers' | 'aging' | 'users' | 'storno';
+type Tab = 'overview' | 'payments' | 'invoices' | 'customers' | 'aging' | 'users' | 'storno' | 'mwst';
 
 // =============================================================================
 //  Main Page
@@ -206,6 +209,7 @@ export function AccountingPage() {
           ['overview',  'Übersicht',     PieChartIcon],
           ['payments',  'Zahlungen',     Wallet],
           ['invoices',  'Rechnungen',    FileText],
+          ['mwst',      'MWsT / UStVA',  Percent],
           ['customers', 'Top-Kunden',    Users],
           ['aging',     'Außenstände',   Clock],
           ['users',     'Mitarbeiter',   UserCog],
@@ -230,6 +234,7 @@ export function AccountingPage() {
       {tab === 'overview'  && <OverviewTab from={from} to={to} />}
       {tab === 'payments'  && <PaymentsTab from={from} to={to} />}
       {tab === 'invoices'  && <InvoicesTab from={from} to={to} statusFilter={null} />}
+      {tab === 'mwst'      && <MwstTab from={from} to={to} />}
       {tab === 'customers' && <CustomersTab from={from} to={to} />}
       {tab === 'aging'     && <AgingTab />}
       {tab === 'users'     && <UsersTab from={from} to={to} />}
@@ -1001,6 +1006,314 @@ function UsersTab({ from, to }: { from: string; to: string }) {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// =============================================================================
+//  MWsT / UMSATZSTEUER TAB — Für die Vorbereitung der Umsatzsteuer-Voranmeldung (UStVA)
+// =============================================================================
+interface MwstKpi {
+  nettoWithVat: number;
+  ustTotal: number;
+  bruttoTotal: number;
+  nettoNoVat: number;
+  gesamtUmsatz: number;
+  countWithVat: number;
+  countNoVat: number;
+  countTotal: number;
+}
+interface MwstMonthly {
+  year: number; month: number;
+  label: string; monthName: string;
+  count: number; countWithVat: number;
+  netto: number; ust: number; brutto: number; nettoNoVat: number;
+}
+interface MwstDetailRow {
+  invoiceId: number; invoiceNumber: string;
+  invoiceDate: string;
+  customerName: string; type: string;
+  netto: number; ustRate: number; ustAmount: number; brutto: number;
+  hasMwst: boolean; currency: string;
+}
+interface MwstResponse {
+  from: string; to: string;
+  kpi: MwstKpi;
+  monthly: MwstMonthly[];
+  details: MwstDetailRow[];
+}
+
+function MwstTab({ from, to }: { from: string; to: string }) {
+  const { data, loading, error } = useFetch<MwstResponse>(`${API_URL}/api/Buchhaltung/mwst?from=${from}&to=${to}`);
+
+  const detailCols = [
+    { key: 'invoiceNumber', label: 'Rechnung',     align: 'left'  as const, width: 95 },
+    { key: 'invoiceDate',   label: 'Datum',        align: 'left'  as const, width: 85 },
+    { key: 'type',          label: 'Typ',          align: 'left'  as const, width: 75 },
+    { key: 'customerName',  label: 'Kunde',        align: 'left'  as const           },
+    { key: 'netto',         label: 'Netto',        align: 'right' as const, width: 95 },
+    { key: 'ustRate',       label: 'USt-Satz',     align: 'right' as const, width: 70 },
+    { key: 'ustAmount',     label: 'USt-Betrag',   align: 'right' as const, width: 100 },
+    { key: 'brutto',        label: 'Brutto',       align: 'right' as const, width: 100 },
+  ];
+
+  const monthlyCols = [
+    { key: 'monthName', label: 'Monat',       align: 'left'  as const           },
+    { key: 'count',     label: '# Rechn.',    align: 'right' as const, width: 80 },
+    { key: 'netto',     label: 'Netto',       align: 'right' as const, width: 110 },
+    { key: 'ust',       label: 'USt 19%',     align: 'right' as const, width: 110 },
+    { key: 'brutto',    label: 'Brutto',      align: 'right' as const, width: 110 },
+    { key: 'nettoNoVat',label: 'Ohne USt',    align: 'right' as const, width: 110 },
+  ];
+
+  const onCsvDetails = () => downloadCsv(
+    (data?.details ?? []).map(r => ({
+      ...r,
+      invoiceDate: fmtDate(r.invoiceDate),
+      netto:     String(r.netto).replace('.', ','),
+      ustRate:   r.hasMwst ? `${Math.round(r.ustRate * 100)}%` : '—',
+      ustAmount: String(r.ustAmount).replace('.', ','),
+      brutto:    String(r.brutto).replace('.', ','),
+    })),
+    `umsatzsteuer_${from}_${to}.csv`,
+    detailCols.map(c => ({ key: c.key, label: c.label })),
+  );
+
+  const onPdfDetails = () => downloadPdfTable({
+    title: 'Umsatzsteuer — Detail',
+    subtitle: `Zeitraum: ${fmtDate(from)} – ${fmtDate(to)}   |   Hinweis: Unterstützt die UStVA. Für Einreichung Steuerberater konsultieren.`,
+    filename: `umsatzsteuer_${from}_${to}.pdf`,
+    columns: detailCols,
+    rows: (data?.details ?? []).map(r => ({
+      ...r,
+      invoiceDate: fmtDate(r.invoiceDate),
+      netto:     fmtCurrency(r.netto, r.currency),
+      ustRate:   r.hasMwst ? `${Math.round(r.ustRate * 100)}%` : '—',
+      ustAmount: r.hasMwst ? fmtCurrency(r.ustAmount, r.currency) : '—',
+      brutto:    fmtCurrency(r.brutto, r.currency),
+    })),
+    meta: data ? [
+      { label: 'Netto (steuerpfl.)', value: fmtCurrency(data.kpi.nettoWithVat) },
+      { label: 'USt eingenommen',    value: fmtCurrency(data.kpi.ustTotal) },
+      { label: 'Brutto',             value: fmtCurrency(data.kpi.bruttoTotal) },
+      { label: 'Ohne USt',           value: fmtCurrency(data.kpi.nettoNoVat) },
+    ] : [],
+  });
+
+  const onCsvMonthly = () => downloadCsv(
+    (data?.monthly ?? []).map(m => ({
+      ...m,
+      netto:      String(m.netto).replace('.', ','),
+      ust:        String(m.ust).replace('.', ','),
+      brutto:     String(m.brutto).replace('.', ','),
+      nettoNoVat: String(m.nettoNoVat).replace('.', ','),
+    })),
+    `ustva_monatlich_${from}_${to}.csv`,
+    monthlyCols.map(c => ({ key: c.key, label: c.label })),
+  );
+
+  const onPdfMonthly = () => downloadPdfTable({
+    title: 'Umsatzsteuer — Monatliche Aufschlüsselung (UStVA-Hilfe)',
+    subtitle: `Zeitraum: ${fmtDate(from)} – ${fmtDate(to)}`,
+    filename: `ustva_monatlich_${from}_${to}.pdf`,
+    columns: monthlyCols,
+    rows: (data?.monthly ?? []).map(m => ({
+      ...m,
+      netto:      fmtCurrency(m.netto),
+      ust:        fmtCurrency(m.ust),
+      brutto:     fmtCurrency(m.brutto),
+      nettoNoVat: fmtCurrency(m.nettoNoVat),
+    })),
+  });
+
+  if (loading) return <LoadingPanel />;
+  if (error)   return <ErrorPanel msg={error} />;
+  if (!data)   return null;
+
+  const kpi = data.kpi;
+  const subPeriod = `${fmtDate(data.from)} – ${fmtDate(data.to)}`;
+
+  return (
+    <div className="space-y-6">
+      {/* Steuerberater-Hinweis */}
+      <div className="p-4 rounded-2xl border-2 border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/10 flex items-start gap-3">
+        <Info size={18} className="text-amber-600 shrink-0 mt-0.5" />
+        <div className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
+          <p className="font-bold mb-1">Hinweis zur Umsatzsteuer-Voranmeldung (UStVA)</p>
+          <p>
+            Diese Auswertung unterstützt die Vorbereitung Ihrer monatlichen/quartalsweisen Umsatzsteuer-Voranmeldung beim Finanzamt. Sie zeigt
+            die <b>USt-pflichtigen Umsätze (Netto)</b>, die <b>eingenommene Umsatzsteuer (19%)</b>, sowie steuerfreie Umsätze (z.B. nach
+            §19 UStG Kleinunternehmer oder §25 UStG Margensteuerung). Für die offizielle Einreichung bitte Steuerberater konsultieren —
+            insbesondere bei Reiseleistungen kann die <b>Margenbesteuerung (§25 UStG)</b> abweichende Berechnungsregeln vorsehen.
+          </p>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <KpiCard
+          label="Netto (steuerpfl.)"
+          value={fmtCurrency(kpi.nettoWithVat)}
+          icon={Euro}
+          color="text-blue-600"
+          bg="bg-blue-50 dark:bg-blue-900/20"
+          sub={`${kpi.countWithVat} Rechn.`}
+        />
+        <KpiCard
+          label="USt eingenommen"
+          value={fmtCurrency(kpi.ustTotal)}
+          icon={Percent}
+          color="text-red-600"
+          bg="bg-red-50 dark:bg-red-900/20"
+          sub="An Finanzamt"
+        />
+        <KpiCard
+          label="Brutto (steuerpfl.)"
+          value={fmtCurrency(kpi.bruttoTotal)}
+          icon={TrendingUp}
+          color="text-emerald-600"
+          bg="bg-emerald-50 dark:bg-emerald-900/20"
+          sub="Netto + USt"
+        />
+        <KpiCard
+          label="Ohne USt"
+          value={fmtCurrency(kpi.nettoNoVat)}
+          icon={Receipt}
+          color="text-zinc-600"
+          bg="bg-zinc-100 dark:bg-zinc-800"
+          sub={`${kpi.countNoVat} Rechn. (§19/§25)`}
+        />
+        <KpiCard
+          label="Gesamt-Umsatz"
+          value={fmtCurrency(kpi.gesamtUmsatz)}
+          icon={Euro}
+          color="text-purple-600"
+          bg="bg-purple-50 dark:bg-purple-900/20"
+          sub={subPeriod}
+        />
+      </div>
+
+      {/* Monthly Chart */}
+      <div className="bg-white dark:bg-zinc-900 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <h3 className="text-sm font-bold text-zinc-900 dark:text-white mb-3 flex items-center gap-2">
+          <Percent size={14} className="text-red-600" /> USt pro Monat (UStVA-Vorbereitung)
+        </h3>
+        {data.monthly.length === 0 ? (
+          <p className="text-xs text-zinc-400 text-center py-12">Keine Daten im Zeitraum</p>
+        ) : (
+          <div style={{ width: '100%', height: 280 }}>
+            <ResponsiveContainer>
+              <BarChart data={data.monthly}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="monthName" tick={{ fontSize: 10 }} />
+                <YAxis tick={{ fontSize: 10 }} />
+                <RTooltip formatter={(v: any) => fmtCurrency(Number(v))} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="netto" stackId="a" fill="#3b82f6" name="Netto" />
+                <Bar dataKey="ust"   stackId="a" fill="#ef4444" name="USt 19%" />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
+      {/* Monthly Table */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Monatliche Aufschlüsselung</h3>
+          <ExportBar onCsv={onCsvMonthly} onPdf={onPdfMonthly} disabled={!data || data.monthly.length === 0} />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-zinc-50/50 dark:bg-zinc-800/50">
+              <tr className="text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                <th className="px-4 py-3 text-left">Monat</th>
+                <th className="px-4 py-3 text-right"># Rechn.</th>
+                <th className="px-4 py-3 text-right">Netto</th>
+                <th className="px-4 py-3 text-right">USt 19%</th>
+                <th className="px-4 py-3 text-right">Brutto</th>
+                <th className="px-4 py-3 text-right">Ohne USt</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {data.monthly.map(m => (
+                <tr key={m.label} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
+                  <td className="px-4 py-2.5 font-bold">{m.monthName}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{m.count} <span className="text-zinc-400">({m.countWithVat} m. USt)</span></td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{fmtCurrency(m.netto)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-bold text-red-600">{fmtCurrency(m.ust)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-bold">{fmtCurrency(m.brutto)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-zinc-500">{fmtCurrency(m.nettoNoVat)}</td>
+                </tr>
+              ))}
+              {data.monthly.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-12 text-center text-zinc-400">Keine Daten</td></tr>
+              )}
+            </tbody>
+            {data.monthly.length > 0 && (
+              <tfoot className="bg-zinc-50 dark:bg-zinc-800/50 font-bold">
+                <tr>
+                  <td className="px-4 py-3">Gesamt</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{kpi.countTotal}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{fmtCurrency(kpi.nettoWithVat)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums text-red-600">{fmtCurrency(kpi.ustTotal)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{fmtCurrency(kpi.bruttoTotal)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{fmtCurrency(kpi.nettoNoVat)}</td>
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      </div>
+
+      {/* Detail Table */}
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Detail — alle Rechnungen mit/ohne USt</h3>
+          <ExportBar onCsv={onCsvDetails} onPdf={onPdfDetails} disabled={!data || data.details.length === 0} />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead className="bg-zinc-50/50 dark:bg-zinc-800/50">
+              <tr className="text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left">Rechnung</th>
+                <th className="px-3 py-3 text-left">Datum</th>
+                <th className="px-3 py-3 text-left">Typ</th>
+                <th className="px-3 py-3 text-left">Kunde</th>
+                <th className="px-3 py-3 text-right">Netto</th>
+                <th className="px-3 py-3 text-right">USt-Satz</th>
+                <th className="px-3 py-3 text-right">USt-Betrag</th>
+                <th className="px-3 py-3 text-right">Brutto</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {data.details.map(r => (
+                <tr key={r.invoiceId} className="hover:bg-zinc-50/50 dark:hover:bg-zinc-800/30">
+                  <td className="px-3 py-2.5">
+                    <Link to={`/invoices/${r.invoiceId}`} className="text-emerald-600 font-bold font-mono hover:underline">{r.invoiceNumber}</Link>
+                  </td>
+                  <td className="px-3 py-2.5 whitespace-nowrap">{fmtDate(r.invoiceDate)}</td>
+                  <td className="px-3 py-2.5">{r.type}</td>
+                  <td className="px-3 py-2.5">{r.customerName}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">{fmtCurrency(r.netto, r.currency)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">
+                    {r.hasMwst
+                      ? <span className="font-bold text-red-600">{Math.round(r.ustRate * 100)}%</span>
+                      : <span className="text-zinc-400">—</span>}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums">
+                    {r.hasMwst ? fmtCurrency(r.ustAmount, r.currency) : <span className="text-zinc-400">—</span>}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums font-bold">{fmtCurrency(r.brutto, r.currency)}</td>
+                </tr>
+              ))}
+              {data.details.length === 0 && (
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-zinc-400">Keine Rechnungen im Zeitraum</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

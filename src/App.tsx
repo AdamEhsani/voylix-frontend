@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { LogoProvider } from './contexts/LogoContext';
+import { AgencyProvider } from './contexts/AgencyContext';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { Loader2 } from 'lucide-react';
 import { Toaster } from 'sonner';
@@ -41,6 +42,7 @@ export default function App() {
         {/* Voylix: tu prod ru voylix.de/app sharah dade mishe — ba basename React Router taght */}
         <BrowserRouter basename={import.meta.env.PROD ? '/app' : '/'}>
           <LogoProvider>
+            <AgencyProvider>
             <Suspense fallback={<PageLoader />}>
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
@@ -66,6 +68,7 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
+            </AgencyProvider>
           </LogoProvider>
 
           <Toaster position="top-right" richColors />

@@ -27,6 +27,8 @@ export function InvoiceDetailPage() {
   const [shareFileData, setShareFileData] = useState<{ base64: string; fileName: string } | null>(null);
   const [printSettings, setPrintSettings] = useState<InvoiceDesignerSettings | null>(null);
   const [agencyLogoPath, setAgencyLogoPath] = useState<string | null>(null);
+  // Voylix: agency-info-e pre-loaded baray-e PDF/Share — chon InvoicePreview tu offscreen render mishe.
+  const [agencyForPdf, setAgencyForPdf] = useState<any | null>(null);
   const sharePreviewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,6 +59,8 @@ export function InvoiceDetailPage() {
           currency:             invoice.payments?.currency             ?? "EUR",
           payment_method:       invoice.payments?.payment_method       ?? "Überweisung",
           payment_date:         invoice.payments?.payment_date         ?? null,
+          // Voylix: mwst_rate hatman bayd hifz beshe — checkbox az in mikhoneh
+          mwst_rate:            invoice.payments?.mwst_rate            ?? null,
           line_items:           invoice.payments?.line_items           ?? [],
           entries:              invoice.payments?.entries              ?? []
         };
@@ -223,10 +227,11 @@ export function InvoiceDetailPage() {
       <div className="fixed left-[-9999px] top-0 pointer-events-none overflow-hidden">
         <div ref={sharePreviewRef} style={{ width: '210mm' }}>
           {data && printSettings && (
-            <InvoicePreview 
-              data={data} 
-              settings={printSettings} 
-              agencyLogoPath={agencyLogoPath} 
+            <InvoicePreview
+              data={data}
+              settings={printSettings}
+              agencyLogoPath={agencyLogoPath}
+              agency={agencyForPdf}
             />
           )}
         </div>
@@ -273,16 +278,24 @@ export function InvoiceDetailPage() {
                 setPrintSettings(settings);
               }
             }
-            if (!agencyLogoPath) {
+            // Voylix: hamishe agency-info-e fa'aal-tarin ro fetch kon — baray PDF lazem-e
+            try {
               const agencyRes = await fetch(`${API_URL}/api/Agency`, {
                 headers: { Authorization: `Bearer ${token}` }
               });
               if (agencyRes.ok) {
-                const agencyData = await agencyRes.json();
-                setAgencyLogoPath(agencyData.logoPath);
+                const agencyJson = await agencyRes.json();
+                const ag = agencyJson?.agency ?? agencyJson;
+                if (ag) {
+                  setAgencyForPdf(ag);
+                  if (!agencyLogoPath && ag.logoPath) setAgencyLogoPath(ag.logoPath);
+                }
               }
+            } catch (e) {
+              console.error('Failed to fetch agency for PDF:', e);
             }
-            await new Promise(resolve => setTimeout(resolve, 300));
+            // sabr koni ta React re-render-e InvoicePreview ba agency-data-y jadid tamoom shavad
+            await new Promise(resolve => setTimeout(resolve, 500));
             if (sharePreviewRef.current && settings) {
               const fileName = `Rechnung_${data.invoice_meta?.invoice_id || id}.pdf`;
               const result = await generateInvoicePdf(sharePreviewRef.current, fileName);

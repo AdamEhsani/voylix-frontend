@@ -4,6 +4,7 @@ import { Printer } from 'lucide-react';
 import { InvoiceDesignerSettings, TravelInvoice } from '../types';
 import { cn, formatDate } from '../utils';
 import LogoAgency from './LogoAgency';
+import { useAgency, type AgencyInfo } from '../contexts/AgencyContext';
 
 // Voylix: datetime ro be format DE neshon bedim "DD.MM.YYYY HH:mm"
 const formatDateTime = (s?: string | null): string => {
@@ -31,9 +32,11 @@ interface InvoicePreviewProps {
   data: TravelInvoice;
   settings: InvoiceDesignerSettings;
   agencyLogoPath?: string | null;
+  /** Voylix: agency pre-loaded — prop dard otsetiat-e print/PDF ke context shayad late bashe */
+  agency?: AgencyInfo | null;
 }
 
-export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePreviewProps) {
+export function InvoicePreview({ data, settings, agencyLogoPath, agency: agencyProp }: InvoicePreviewProps) {
   const {
     logoPosition,
     logoSize,
@@ -50,6 +53,27 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
     primaryColor,
     fontSize
   } = settings;
+
+  // Voylix: agency az prop awal estefade mishe (baray print/PDF, vaqti context shayad late bashe).
+  // Vagar na az AgencyContext miad.
+  const { agency: agencyCtx } = useAgency();
+  const agency = agencyProp ?? agencyCtx;
+  const agencyName    = agency?.name        || agency?.legalName || 'Ihre Agentur';
+  const agencyLegal   = agency?.legalName   || agency?.name      || '';
+  const agencyStreet  = agency?.address     || '';
+  const agencyPlz     = agency?.postalCode  || '';
+  const agencyCity    = agency?.city        || '';
+  const agencyAddrLine = [agencyStreet, [agencyPlz, agencyCity].filter(Boolean).join(' ')]
+    .filter(Boolean)
+    .join(', ');
+  const agencyPhone   = agency?.phone   || '';
+  const agencyEmail   = agency?.email   || '';
+  const agencyWebsite = agency?.website || '';
+  const agencyVatId   = agency?.vatId   || '';
+  const agencyTaxInfo = agency?.taxInfo || '';
+  const agencyIban    = agency?.iban    || '';
+  const agencyBic     = agency?.bic     || '';
+  const agencyBank    = agency?.bankName || '';
 
   const spacingClass = mode === 'compact' ? 'py-1' : 'py-3';
   const borderClass = showBorders ? 'border border-zinc-200 p-4 rounded-lg' : '';
@@ -104,10 +128,16 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                   {titleCustomization}
                 </h1>
                 <div className="text-[8.5px] text-zinc-500 space-y-0.5">
-                  <p className="font-bold text-zinc-900">TRAVEL AGENCY CRM GMBH</p>
-                  <p>Musterstraße 1, 12345 Berlin</p>
-                  <p>Tel: +49 30 12345678 | Email: info@travel-crm.de</p>
-                  <p>USt-IdNr.: DE 123 456 789</p>
+                  {/* Voylix: balay-e Rechnung faqat esm + adres + telefon + email — etela'at-e maliat tu footer */}
+                  <p className="font-bold text-zinc-900 uppercase">{agencyLegal || agencyName}</p>
+                  {agencyAddrLine && <p>{agencyAddrLine}</p>}
+                  {(agencyPhone || agencyEmail) && (
+                    <p>
+                      {agencyPhone && <>Tel: {agencyPhone}</>}
+                      {agencyPhone && agencyEmail && <> | </>}
+                      {agencyEmail && <>Email: {agencyEmail}</>}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -140,13 +170,13 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
 
             {/* Meta Block */}
             <div className={cn("text-right space-y-1", customerBlockPosition === 'right' && "order-1 text-left")}>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px]">
+              <div className="inline-grid grid-cols-[auto_auto] gap-x-1.5 gap-y-0.5 text-[10px]">
                 <span className="text-zinc-400 font-medium">Rechnungsnummer:</span>
-                <span className="font-bold">{'R-' + data.id}</span>
+                <span className="font-bold text-right">{data.invoice_meta?.invoice_number || `R-${data.id}`}</span>
                 <span className="text-zinc-400 font-medium">Datum:</span>
-                <span className="font-bold">{formatDate(data.invoice_meta?.invoice_date ?? null)}</span>
+                <span className="font-bold text-right">{formatDate(data.invoice_meta?.invoice_date ?? null)}</span>
                 <span className="text-zinc-400 font-medium">Kundennummer:</span>
-                <span className="font-bold">{"C-" + data.customer?.customerNumber}</span>
+                <span className="font-bold text-right">{data.customer?.customerNumber ? `C-${data.customer.customerNumber}` : '—'}</span>
               </div>
             </div>
           </div>
@@ -298,7 +328,16 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
           </div>
         );
 
-      case 'payments':
+      case 'payments': {
+        // Voylix: MWsT-Anzeige (Netto + USt + Brutto) bei aktiviertem mwst_rate
+        const netto    = Number(data.payments?.invoice_total) || 0;
+        const mwstRate = Number(data.payments?.mwst_rate ?? 0) || 0;
+        const mwstOn   = mwstRate > 0;
+        const mwstAmt  = Math.round(netto * mwstRate * 100) / 100;
+        const brutto   = netto + mwstAmt;
+        const curr     = data.payments?.currency || 'EUR';
+        const fmt = (n: number) => n.toLocaleString('de-DE', { style: 'currency', currency: curr });
+
         return (
           <div key="payments" className={cn("mb-2", spacingClass)}>
             <table className="w-full text-[11px]">
@@ -312,29 +351,54 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
                 {data.payments?.line_items?.map((item, i) => (
                   <tr key={i}>
                     <td className="py-2.5 font-medium">{item.name}</td>
-                    <td className="py-2.5 text-right font-bold">{item.amount.toLocaleString('de-DE', { style: 'currency', currency: data.payments.currency })}</td>
+                    <td className="py-2.5 text-right font-bold">{fmt(item.amount)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-zinc-900">
-                  <td className="py-3 text-base font-bold text-zinc-900">Gesamtbetrag</td>
-                  <td className="py-3 text-right text-lg font-bold" style={{ color: primaryColor }}>
-                    {Number(data.payments?.invoice_total).toLocaleString('de-DE', { style: 'currency', currency: data.payments.currency })}
+                {mwstOn && (
+                  <>
+                    <tr className="border-t-2 border-zinc-900">
+                      <td className="py-2 text-[10px] font-medium text-zinc-600 uppercase tracking-wide">Netto</td>
+                      <td className="py-2 text-right text-[11px] font-bold tabular-nums">{fmt(netto)}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 text-[10px] font-medium text-zinc-600 uppercase tracking-wide">
+                        zzgl. USt ({(mwstRate * 100).toFixed(0)} %)
+                      </td>
+                      <td className="py-1.5 text-right text-[11px] font-bold tabular-nums">{fmt(mwstAmt)}</td>
+                    </tr>
+                  </>
+                )}
+                <tr className={mwstOn ? "border-t border-zinc-300" : "border-t-2 border-zinc-900"}>
+                  <td className="py-3 text-base font-bold text-zinc-900">{mwstOn ? 'Gesamtbetrag (Brutto)' : 'Gesamtbetrag'}</td>
+                  <td className="py-3 text-right text-lg font-bold tabular-nums" style={{ color: primaryColor }}>
+                    {fmt(mwstOn ? brutto : netto)}
                   </td>
                 </tr>
               </tfoot>
             </table>
           </div>
         );
+      }
 
       case 'notizen': {
-        const text  = (settings.notizenText ?? '').trim();
-        const title = (settings.notizenTitle ?? 'Notizen').trim();
-        if (text.length === 0) return null;
+        // Voylix: do nooe Notiz hast —
+        // 1) per-invoice (data.notizen): mahsus-e in Rechnung
+        // 2) per-agency (settings.notizenText): template-e agency
+        // Har do tu print zaher mishan (aval invoice-Notiz, baad agency-Notiz)
+        const agencyText  = (settings.notizenText ?? '').trim();
+        const agencyTitle = (settings.notizenTitle ?? 'Notizen').trim();
         const align = settings.notizenAlign ?? 'left';
         const sizePt = settings.notizenFontSize ?? 9;
         const bold = settings.notizenBold === true;
+
+        const invoiceNotes = (data.notizen ?? [])
+          .filter(n => n.includeInPrint !== false && (n.text ?? '').trim().length > 0)
+          .map(n => (n.text ?? '').trim());
+
+        if (invoiceNotes.length === 0 && agencyText.length === 0) return null;
+
         return (
           <div
             key="notizen"
@@ -345,23 +409,46 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
               align === 'right'  && "text-right",
             )}
           >
-            {title && (
-              <p
-                className="font-bold uppercase tracking-wide text-zinc-700 mb-1"
-                style={{ fontSize: `${Math.max(sizePt, 8)}pt` }}
-              >
-                {title}
-              </p>
+            {/* Invoice-spezifische Notiz */}
+            {invoiceNotes.length > 0 && (
+              <div className={agencyText ? "mb-3" : ""}>
+                {invoiceNotes.map((t, i) => (
+                  <p
+                    key={i}
+                    className={cn(
+                      "leading-snug text-zinc-800 whitespace-pre-wrap",
+                      bold && "font-bold"
+                    )}
+                    style={{ fontSize: `${sizePt}pt` }}
+                  >
+                    {t}
+                  </p>
+                ))}
+              </div>
             )}
-            <p
-              className={cn(
-                "leading-snug text-zinc-800 whitespace-pre-wrap",
-                bold && "font-bold"
-              )}
-              style={{ fontSize: `${sizePt}pt` }}
-            >
-              {text}
-            </p>
+
+            {/* Agency-Notiz (Template) */}
+            {agencyText.length > 0 && (
+              <>
+                {agencyTitle && (
+                  <p
+                    className="font-bold uppercase tracking-wide text-zinc-700 mb-1"
+                    style={{ fontSize: `${Math.max(sizePt, 8)}pt` }}
+                  >
+                    {agencyTitle}
+                  </p>
+                )}
+                <p
+                  className={cn(
+                    "leading-snug text-zinc-800 whitespace-pre-wrap",
+                    bold && "font-bold"
+                  )}
+                  style={{ fontSize: `${sizePt}pt` }}
+                >
+                  {agencyText}
+                </p>
+              </>
+            )}
           </div>
         );
       }
@@ -372,20 +459,26 @@ export function InvoicePreview({ data, settings, agencyLogoPath }: InvoicePrevie
             <div className="grid grid-cols-3 gap-8 text-[8px] text-zinc-400 leading-normal">
               <div>
                 <p className="font-bold text-zinc-900 uppercase mb-1">Zahlungsinformationen</p>
-                <p>Bitte überweisen Sie den Betrag bis zum {formatDate(data.payments?.payment_date ?? null)}.</p>
-                <p>IBAN: DE12 3456 7890 1234 5678 90</p>
-                <p>BIC: GENO DE F1 M01</p>
+                {data.payments?.payment_date && (
+                  <p>Bitte überweisen Sie den Betrag bis zum {formatDate(data.payments.payment_date)}.</p>
+                )}
+                {agencyBank && <p>{agencyBank}</p>}
+                {agencyIban && <p>IBAN: {agencyIban}</p>}
+                {agencyBic && <p>BIC: {agencyBic}</p>}
               </div>
               <div>
                 <p className="font-bold text-zinc-900 uppercase mb-1">Rechtliche Hinweise</p>
-                <p>{data.legal_notes?.immediate_due_notice}</p>
-                <p>{data.legal_notes?.tax_change_notice}</p>
+                {data.legal_notes?.immediate_due_notice && <p>{data.legal_notes.immediate_due_notice}</p>}
+                {data.legal_notes?.tax_change_notice && <p>{data.legal_notes.tax_change_notice}</p>}
+                {agencyVatId && <p>USt-IdNr.: {agencyVatId}</p>}
               </div>
               <div className="text-right">
                 <p className="font-bold text-zinc-900 uppercase mb-1 text-zinc-600">Kontakt</p>
-                <p>Travel Agency CRM GmbH</p>
-                <p>Am Kupfergraben 6, 10117 Berlin</p>
-                <p>www.travel-crm.de</p>
+                <p>{agencyLegal || agencyName}</p>
+                {agencyAddrLine && <p>{agencyAddrLine}</p>}
+                {agencyPhone && <p>Tel: {agencyPhone}</p>}
+                {agencyEmail && <p>{agencyEmail}</p>}
+                {agencyWebsite && <p>{agencyWebsite}</p>}
               </div>
             </div>
           </div>
